@@ -2,7 +2,7 @@
 
 import importlib
 
-__all__ = ["io", "logs", "merge_saliva"]
+__all__ = ["io", "logs", "merge_saliva", "saliva"]
 
 __version__ = "0.1.0"
 

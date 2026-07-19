@@ -1,0 +1,17 @@
+.DS_Store
+.venv/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+docs/_build/
+docs/auto_examples/
+docs/modules/generated/
+docs/README.md
+docs/CHANGELOG.md

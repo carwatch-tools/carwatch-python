@@ -6,7 +6,9 @@ authors = [
     {name = "Robert Richer", email = "robert.richer@fau.de"},
 ]
 requires-python = ">=3.10,<4.0"
-dependencies = []
+dependencies = [
+    "pandas>=2,<3",
+]
 license = "MIT"
 readme = "README.md"
 

@@ -11,3 +11,7 @@ class LogParseError(CarwatchError, ValueError):
 
 class SchemaError(CarwatchError, ValueError):
     """Raised when input data do not follow the expected schema."""
+
+
+class MergeError(CarwatchError, ValueError):
+    """Raised when study results and saliva data cannot be merged safely."""

@@ -336,6 +336,7 @@ def _prepare_data(
     values = frame.pivot(
         index=group_cols, columns="sample", values=saliva_type
     ).reindex(columns=labels)
+    values = values.apply(pd.to_numeric, errors="raise").astype(float)
     values.columns.name = "sample"
     times = None
     if time_column in frame:

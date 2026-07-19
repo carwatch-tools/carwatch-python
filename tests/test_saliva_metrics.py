@@ -120,6 +120,14 @@ def test_compute_features_returns_common_feature_set():
     ]
 
 
+def test_metrics_accept_numeric_values_stored_with_object_dtype():
+    data = saliva_data().astype(object)
+
+    result = cw.saliva.compute_features(data)
+
+    assert result.loc[("VP01", "D1"), "cortisol_auc_g"] == pytest.approx(75)
+
+
 def test_metrics_support_multiple_analytes():
     result = cw.saliva.auc(saliva_data(), saliva_type=["cortisol", "amylase"])
 

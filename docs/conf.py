@@ -80,9 +80,13 @@ if os.environ.get("NO_MATHJAX"):
     mathjax_path = ""
 else:
     extensions.append("sphinx.ext.mathjax")
-    mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/" "tex-chtml.js"
+    mathjax_path = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"
 
-autodoc_default_options = {"members": True, "inherited-members": True, "special_members": True}
+autodoc_default_options = {
+    "members": True,
+    "inherited-members": True,
+    "special_members": True,
+}
 # autodoc_typehints = 'description'  # Does not work as expected. Maybe try at future date again
 
 # Add any paths that contain templates here, relative to this directory.
@@ -128,8 +132,8 @@ html_theme_options = {
 # intersphinx configuration
 intersphinx_module_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
-    "matplotlib": ("https://matplotlib.org/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+    "matplotlib": ("https://matplotlib.org/stable/", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
 }
@@ -145,7 +149,10 @@ intersphinx_mapping = {
 sphinx_gallery_conf = {
     "examples_dirs": ["../examples"],
     "gallery_dirs": ["./auto_examples"],
-    "reference_url": {"carwatch": None, **{k: v[0] for k, v in intersphinx_module_mapping.items()}},
+    "reference_url": {
+        "carwatch": None,
+        **{k: v[0] for k, v in intersphinx_module_mapping.items()},
+    },
     # 'default_thumb_file': 'fig/logo.png',
     "backreferences_dir": "modules/generated/backreferences",
     "doc_module": ("carwatch",),
@@ -155,10 +162,15 @@ sphinx_gallery_conf = {
 }
 
 
-from sphinxext.githublink import make_linkcode_resolve
+from sphinxext.githublink import make_linkcode_resolve  # noqa: E402
 
-linkcode_resolve = make_linkcode_resolve(
+
+_linkcode_resolve = make_linkcode_resolve(
     "carwatch",
     "https://github.com/carwatch-tools/carwatch-python/blob/{revision}/{package}/{path}#L{lineno}",
 )
 
+
+def linkcode_resolve(domain, info):
+    """Resolve source-code links without exposing a partial to Sphinx."""
+    return _linkcode_resolve(domain, info)

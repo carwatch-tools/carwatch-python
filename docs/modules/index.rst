@@ -1,11 +1,11 @@
-.. _api_ref:
-
+API reference
 =============
-API Reference
-=============
-
-This is the API Reference for ``carwatch``.
 
 .. toctree::
-    :maxdepth: 1
+   :maxdepth: 1
 
+   io
+   logs
+   merge
+   saliva
+   exceptions

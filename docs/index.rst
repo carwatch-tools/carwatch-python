@@ -1,21 +1,21 @@
-.. carwatch documentation master file
+carwatch documentation
+======================
 
-carwatch Docu Overview
-==================
+``carwatch`` connects CARWatch sampling records with laboratory saliva data and
+provides an auditable correction step for accidentally swapped samples.
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Content:
+   :maxdepth: 2
+   :caption: Contents
 
    Getting Started <README.md>
-   guides/index.rst
-   modules/index.rst
-   auto_examples/index.rst
+   guides/index
+   modules/index
+   auto_examples/index
    Changelog <CHANGELOG.md>
 
-Indices and Tables
-==================
+Indices
+-------
 
 * :ref:`genindex`
 * :ref:`modindex`
-* :ref:`search`

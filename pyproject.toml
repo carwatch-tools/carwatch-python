@@ -14,6 +14,11 @@ dependencies = [
 license = "MIT"
 readme = "README.md"
 
+[project.urls]
+Documentation = "https://carwatch-tools.github.io/carwatch-python/"
+Repository = "https://github.com/carwatch-tools/carwatch-python"
+Issues = "https://github.com/carwatch-tools/carwatch-python/issues"
+
 
 [build-system]
 requires = ["hatchling"]
@@ -51,6 +56,7 @@ dev = [
     "memory-profiler>=0.61.0",
     "numpydoc>=1.10.0",
     "poethepoet>=0.48.0",
+    "pydata-sphinx-theme>=0.16,<1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "recommonmark>=0.7.1",

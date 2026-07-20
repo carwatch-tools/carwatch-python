@@ -32,3 +32,10 @@ def test_import_example_runs_with_synthetic_data():
         "B2",
         "B3",
     ]
+    assert namespace["merged_samples"]["cortisol"].tolist() == [1.0, 3.0, 2.0, 4.0]
+    assert namespace["merged_samples"]["mismatch_corrected"].tolist() == [
+        False,
+        True,
+        True,
+        False,
+    ]

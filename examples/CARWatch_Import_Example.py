@@ -33,7 +33,6 @@ print(
             "sampling_time",
             "sample",
             "sample_scanned",
-            "barcode",
             "sample_mismatch",
         ]
     ]
@@ -62,7 +61,7 @@ print(study_samples)
 # Keep the recorded mismatch information visible for audit and later correction.
 mismatches = study_samples.loc[study_samples["sample_mismatch"].fillna(False)]
 print("\nRecorded sample swaps")
-print(mismatches[["barcode", "sample_scanned"]])
+print(mismatches[["sample_scanned"]])
 print("\nRecorded daily mismatch summary")
 print(study_days[["mismatch_summary"]])
 
@@ -75,8 +74,8 @@ print(
     merged_samples[
         [
             "sampling_time",
+            "time_min",
             "sample_scanned",
-            "saliva_sample",
             "cortisol",
             "mismatch_corrected",
         ]

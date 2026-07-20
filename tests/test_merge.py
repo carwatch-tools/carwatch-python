@@ -38,9 +38,11 @@ def test_merge_saliva_corrects_swaps_from_summary(tmp_path):
 
     assert result.index.names == ["participant", "day", "sample"]
     assert result["cortisol"].tolist() == [1.0, 3.0, 2.0, 4.0]
-    assert result["saliva_sample"].tolist() == ["B1", "B3", "B2", "B4"]
     assert result["match_method"].tolist() == ["sample_scanned"] * 4
     assert result["mismatch_corrected"].tolist() == [False, True, True, False]
+    assert "saliva_sample" not in result
+    assert "barcode" not in result
+    assert "time_min" in result
 
 
 def test_merge_saliva_supports_raw_log_sample_events(tmp_path):
@@ -89,7 +91,6 @@ def test_merge_saliva_distinguishes_missing_value_from_unmatched_sample(tmp_path
     assert result.loc[("02", "D1", "B1"), "merge_status"] == "matched"
     assert pd.isna(result.loc[("02", "D1", "B1"), "cortisol"])
     assert result.loc[("02", "D1", "B4"), "merge_status"] == "unmatched"
-    assert pd.isna(result.loc[("02", "D1", "B4"), "saliva_sample"])
 
 
 def test_merge_saliva_can_require_complete_matching(tmp_path):

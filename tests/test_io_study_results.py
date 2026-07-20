@@ -111,7 +111,8 @@ def test_extract_sample_events_from_summary_derives_sample_fields(tmp_path):
         "B4",
     ]
     assert samples["sample_mismatch"].tolist() == [False, True, True, False]
-    assert samples.loc[("02", "D1", "B1"), "time"] == pytest.approx(25 / 60)
+    assert samples.loc[("02", "D1", "B1"), "time_min"] == pytest.approx(25 / 60)
+    assert "barcode" not in samples
     assert "awakening_time" not in samples
     assert "mismatch_summary" not in samples
 

@@ -58,7 +58,6 @@ def extract_sample_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFrame:
                 "day_scanned": payload.get("day_scanned"),
                 "sample": expected,
                 "sample_scanned": scanned,
-                "barcode": _string_or_missing(payload.get("barcode_value")),
                 "sample_mismatch": bool(expected and scanned and expected != scanned),
                 "source_file": getattr(row, "source_file", None),
             }
@@ -140,8 +139,7 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
                 rows.append(
                     {
                         "sampling_time": sampling_time,
-                        "time": _minutes_between(sampling_time, awakening_time),
-                        "barcode": barcode,
+                        "time_min": _minutes_between(sampling_time, awakening_time),
                         "sample_scanned": sample_scanned,
                         "sample_mismatch": _sample_mismatch(sample, sample_scanned),
                         "observed": not (
@@ -156,14 +154,12 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
         index=pd.MultiIndex.from_tuples(index, names=["participant", "day", "sample"]),
         columns=[
             "sampling_time",
-            "time",
-            "barcode",
+            "time_min",
             "sample_scanned",
             "sample_mismatch",
             "observed",
         ],
     )
-    result["barcode"] = pd.array(result["barcode"], dtype="string")
     result["sample_scanned"] = pd.array(result["sample_scanned"], dtype="string")
     result["sample_mismatch"] = pd.array(result["sample_mismatch"], dtype="boolean")
     result["observed"] = pd.array(result["observed"], dtype="boolean")
@@ -215,12 +211,6 @@ def _expected_sample(payload: dict) -> str | None:
     if payload.get("id") == 815:
         return "SE"
     return f"S{saliva_id}"
-
-
-def _string_or_missing(value) -> str | None:
-    if value is None or pd.isna(value):
-        return None
-    return str(value)
 
 
 def _validate_raw_logs(raw_logs: pd.DataFrame) -> None:

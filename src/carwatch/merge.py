@@ -11,7 +11,6 @@ _SUMMARY_INDEX = ["participant", "day", "sample"]
 _RAW_LOG_INDEX = ["participant", "date", "sample"]
 _SALIVA_INDEX = ["subject", "sample"]
 _PROVENANCE_COLUMNS = {
-    "saliva_sample",
     "match_method",
     "merge_status",
     "mismatch_corrected",
@@ -82,13 +81,13 @@ def merge_saliva(
 
     _validate_event_matches(events)
     laboratory = laboratory.rename(
-        columns={"subject": "participant", "sample": "saliva_sample"}
+        columns={"subject": "participant", "sample": "_matched_sample"}
     )
     merged = events.merge(
         laboratory,
         how="left",
         left_on=["participant", "_match_sample"],
-        right_on=["participant", "saliva_sample"],
+        right_on=["participant", "_matched_sample"],
         sort=False,
         validate="one_to_one",
         indicator="_merge_source",
@@ -100,7 +99,7 @@ def merge_saliva(
         matched.map({True: "matched", False: "unmatched"}), dtype="string"
     )
     if correct_swaps:
-        corrected = matched & merged["sample"].ne(merged["saliva_sample"])
+        corrected = matched & merged["sample"].ne(merged["_matched_sample"])
         merged["mismatch_corrected"] = corrected.fillna(False).astype(bool)
     else:
         merged["mismatch_corrected"] = False
@@ -120,6 +119,7 @@ def merge_saliva(
         "_match_sample",
         "_match_method",
         "_merge_source",
+        "_matched_sample",
     ]
     return merged.drop(columns=helper_columns).set_index(index_columns)
 

@@ -108,8 +108,8 @@ def test_extract_sample_events_from_raw_logs_marks_swapped_tube(tmp_path):
 
     assert samples["sample"].tolist() == ["B1", "B2"]
     assert samples["sample_scanned"].tolist() == ["B1", "B3"]
-    assert samples["barcode"].tolist() == ["0010101", "0010103"]
     assert samples["sample_mismatch"].tolist() == [False, True]
+    assert "barcode" not in samples
     assert "study" not in samples
     assert "event_index" not in samples
 

@@ -15,7 +15,6 @@ def test_import_example_runs_with_synthetic_data():
         False,
     ]
     assert namespace["study_results"].index.names == [
-        "study",
         "participant",
         "day",
         "sample",

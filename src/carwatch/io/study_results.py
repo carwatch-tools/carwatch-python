@@ -14,7 +14,7 @@ _SAMPLE_COLUMN = re.compile(
     r"^(?P<field>sampling_time|sample_barcode|sample_scanned)_d(?P<day>\d+)_(?P<sample>.+)$",
     re.IGNORECASE,
 )
-_INDEX = ["study", "participant", "day", "sample"]
+_INDEX = ["participant", "day", "sample"]
 _OUTPUT_COLUMNS = [
     "date",
     "awakening_time",
@@ -49,8 +49,8 @@ def load_study_results(path: str | Path, *, tz: str = "Europe/Berlin") -> pd.Dat
     Returns
     -------
     pandas.DataFrame
-        Normalized results indexed by ``study``, ``participant``, ``day``,
-        and expected ``sample``.
+        Normalized results indexed by ``participant``, ``day``, and expected
+        ``sample``.
 
     """
     path = Path(path)
@@ -64,7 +64,6 @@ def load_study_results(path: str | Path, *, tz: str = "Europe/Berlin") -> pd.Dat
         raise SchemaError("Study results file does not contain any participants.")
 
     columns = _case_insensitive_columns(data)
-    study_col = _required_column(columns, "study name")
     participant_col = _required_column(columns, "participant id")
     days, samples = _discover_layout(data.columns)
     if not days:
@@ -74,17 +73,15 @@ def load_study_results(path: str | Path, *, tz: str = "Europe/Berlin") -> pd.Dat
 
     rows: list[dict] = []
     for source_row in data.to_dict(orient="records"):
-        study = _clean_string(source_row[study_col])
         participant = _clean_string(source_row[participant_col])
-        if study is None or participant is None:
-            raise SchemaError("Study name and participant ID must not be empty.")
+        if participant is None:
+            raise SchemaError("Participant ID must not be empty.")
         for day_number in days:
             rows.extend(
                 _normalize_day(
                     source_row,
                     columns=columns,
                     samples=samples.get(day_number, []),
-                    study=study,
                     participant=participant,
                     day_number=day_number,
                     tz=tz,
@@ -103,7 +100,6 @@ def _normalize_day(
     *,
     columns: dict[str, str],
     samples: list[str],
-    study: str,
     participant: str,
     day_number: int,
     tz: str,
@@ -146,7 +142,6 @@ def _normalize_day(
         observed = not (pd.isna(sampling_time) and barcode is None)
         normalized.append(
             {
-                "study": study,
                 "participant": participant,
                 "day": day,
                 "sample": sample,

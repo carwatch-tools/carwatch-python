@@ -21,7 +21,7 @@ def _write_csv(tmp_path, content=STUDY_RESULTS):
 def test_load_study_results_normalizes_samples(tmp_path):
     result = cw.io.load_study_results(_write_csv(tmp_path))
 
-    assert result.index.names == ["study", "participant", "day", "sample"]
+    assert result.index.names == ["participant", "day", "sample"]
     assert result.index.get_level_values("participant").unique().tolist() == ["02"]
     assert result.index.get_level_values("sample").tolist() == ["B1", "B2", "B3", "B4"]
     assert result["barcode"].tolist() == ["0010101", "0010103", "0010102", "0010104"]
@@ -30,8 +30,8 @@ def test_load_study_results_normalizes_samples(tmp_path):
 def test_load_study_results_preserves_swap_information(tmp_path):
     result = cw.io.load_study_results(_write_csv(tmp_path))
 
-    assert result.loc[("logs", "02", "D1", "B2"), "sample_scanned"] == "B3"
-    assert result.loc[("logs", "02", "D1", "B3"), "sample_scanned"] == "B2"
+    assert result.loc[("02", "D1", "B2"), "sample_scanned"] == "B3"
+    assert result.loc[("02", "D1", "B3"), "sample_scanned"] == "B2"
     assert result["sample_mismatch"].tolist() == [False, True, True, False]
     assert result["mismatch_summary"].unique().tolist() == ["B2->B3;B3->B2"]
 
@@ -39,7 +39,7 @@ def test_load_study_results_preserves_swap_information(tmp_path):
 def test_load_study_results_combines_date_and_times(tmp_path):
     result = cw.io.load_study_results(_write_csv(tmp_path))
 
-    first = result.loc[("logs", "02", "D1", "B1")]
+    first = result.loc[("02", "D1", "B1")]
     assert first["date"] == pd.Timestamp("2025-05-15", tz="Europe/Berlin")
     assert first["awakening_time"] == pd.Timestamp("2025-05-15 06:13:30", tz="Europe/Berlin")
     assert first["sampling_time"] == pd.Timestamp("2025-05-15 06:13:55", tz="Europe/Berlin")
@@ -54,7 +54,7 @@ def test_load_study_results_retains_empty_sample_slots(tmp_path):
 
     result = cw.io.load_study_results(path)
 
-    empty = result.loc[("logs", "02", "D1", "B4")]
+    empty = result.loc[("02", "D1", "B4")]
     assert not empty["observed"]
     assert pd.isna(empty["sampling_time"])
     assert empty["sample_scanned"] == "B4"
@@ -78,12 +78,21 @@ study,VP_01,2025-05-15,06:00:00,05:59:00,self-report,06:00:30,0001,S1,2025-05-16
     [
         "Study Name,Participant ID\nstudy,01\n",
         "Study Name,Participant ID,date_D1\nstudy,01,2025-01-01\n",
-        "Participant ID,date_D1,sampling_time_D1_S1\n01,2025-01-01,06:00\n",
     ],
 )
 def test_load_study_results_rejects_invalid_schema(tmp_path, content):
     with pytest.raises(SchemaError):
         cw.io.load_study_results(_write_csv(tmp_path, content))
+
+
+def test_load_study_results_does_not_require_study_name(tmp_path):
+    content = """Participant ID,date_D1,sampling_time_D1_S1
+01,2025-01-01,06:00:00
+"""
+
+    result = cw.io.load_study_results(_write_csv(tmp_path, content))
+
+    assert result.index.tolist() == [("01", "D1", "S1")]
 
 
 def test_load_study_results_rejects_duplicate_participants(tmp_path):

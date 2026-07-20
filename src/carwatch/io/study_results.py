@@ -228,8 +228,9 @@ def _combine_date_time(
     if pd.isna(date) or value is None:
         return pd.NaT
     try:
-        time_delta = pd.to_timedelta(value)
-        return date.normalize() + time_delta
+        midnight = pd.Timestamp(date.date())
+        local = midnight + pd.to_timedelta(value)
+        return local.tz_localize(tz, ambiguous="raise", nonexistent="raise")
     except (TypeError, ValueError) as exc:
         raise SchemaError(f"Invalid local time for timezone {tz!r}: {value!r}") from exc
 

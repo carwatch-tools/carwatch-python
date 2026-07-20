@@ -8,14 +8,16 @@ def test_import_example_runs_with_synthetic_data():
     namespace = run_path(str(example))
 
     assert len(namespace["logs"]) == 5
-    assert namespace["samples"]["sample_mismatch"].tolist() == [
+    assert namespace["log_samples"]["sample_mismatch"].tolist() == [
         False,
         True,
         True,
         False,
     ]
-    assert namespace["study_results"].index.names == [
-        "study",
+    assert namespace["study_results"].index.name == "participant"
+    assert namespace["study_results"].columns.names == ["day", "sample", "variable"]
+    assert namespace["study_awakening"].index.names == ["participant", "day"]
+    assert namespace["study_samples"].index.names == [
         "participant",
         "day",
         "sample",

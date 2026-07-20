@@ -8,7 +8,7 @@ from carwatch.exceptions import SchemaError
 
 __all__ = ["extract_awakening", "extract_samples"]
 
-_REQUIRED_COLUMNS = {"study", "participant", "date", "timestamp", "action", "payload"}
+_REQUIRED_COLUMNS = {"participant", "date", "timestamp", "action", "payload"}
 
 
 def extract_samples(logs: pd.DataFrame) -> pd.DataFrame:
@@ -37,7 +37,6 @@ def extract_samples(logs: pd.DataFrame) -> pd.DataFrame:
         scanned = payload.get("sample_scanned") or expected
         rows.append(
             {
-                "study": row.study,
                 "participant": row.participant,
                 "date": row.date,
                 "sampling_time": row.timestamp,
@@ -48,7 +47,6 @@ def extract_samples(logs: pd.DataFrame) -> pd.DataFrame:
                 "barcode": _string_or_missing(payload.get("barcode_value")),
                 "sample_mismatch": bool(expected and scanned and expected != scanned),
                 "source_file": getattr(row, "source_file", None),
-                "event_index": getattr(row, "event_index", None),
             }
         )
     return pd.DataFrame(rows)
@@ -77,25 +75,23 @@ def extract_awakening(logs: pd.DataFrame) -> pd.DataFrame:
     ].copy()
     if candidate.empty:
         return pd.DataFrame(
-            columns=["study", "participant", "date", "awakening_time", "awakening_type"]
+            columns=["participant", "date", "awakening_time", "awakening_type"]
         )
 
     candidate["priority"] = candidate["action"].map(
         {"spontaneous_awakening": 0, "alarm_stop": 1}
     )
     candidate = candidate.sort_values(
-        ["study", "participant", "date", "priority", "timestamp"],
+        ["participant", "date", "priority", "timestamp"],
         kind="stable",
         na_position="last",
     )
-    candidate = candidate.drop_duplicates(
-        ["study", "participant", "date"], keep="first"
-    )
+    candidate = candidate.drop_duplicates(["participant", "date"], keep="first")
     candidate["awakening_type"] = candidate["action"].map(
         {"spontaneous_awakening": "self-report", "alarm_stop": "alarm"}
     )
     return candidate.rename(columns={"timestamp": "awakening_time"})[
-        ["study", "participant", "date", "awakening_time", "awakening_type"]
+        ["participant", "date", "awakening_time", "awakening_type"]
     ].reset_index(drop=True)
 
 

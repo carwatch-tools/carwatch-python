@@ -32,8 +32,16 @@ def test_load_current_log_and_preserve_identifiers(tmp_path):
     data = cw.io.load_logs(path)
 
     assert len(data) == 3
+    assert data.columns.tolist() == [
+        "participant",
+        "date",
+        "timestamp",
+        "timestamp_ms",
+        "action",
+        "payload",
+        "source_file",
+    ]
     assert data["participant"].unique().tolist() == ["02"]
-    assert data["study"].unique().tolist() == ["logs"]
     assert str(data["timestamp"].dt.tz) == "Europe/Berlin"
     assert data.iloc[1]["payload"]["barcode_value"] == "0010101"
     assert data.iloc[0]["date"] == pd.Timestamp("2025-05-15", tz="Europe/Berlin")
@@ -57,7 +65,6 @@ def test_load_legacy_three_column_log(tmp_path):
 
     data = cw.io.load_logs(path)
 
-    assert data.loc[0, "timestamp_recorded"] is None
     assert data.loc[0, "action"] == "spontaneous_awakening"
 
 
@@ -103,6 +110,8 @@ def test_extract_samples_marks_swapped_tube(tmp_path):
     assert samples["sample_scanned"].tolist() == ["B1", "B3"]
     assert samples["barcode"].tolist() == ["0010101", "0010103"]
     assert samples["sample_mismatch"].tolist() == [False, True]
+    assert "study" not in samples
+    assert "event_index" not in samples
 
 
 def test_extract_awakening_prefers_self_report(tmp_path):
@@ -117,6 +126,7 @@ def test_extract_awakening_prefers_self_report(tmp_path):
 
     assert len(awakening) == 1
     assert awakening.loc[0, "awakening_type"] == "self-report"
+    assert "study" not in awakening
 
 
 def test_extractors_validate_input_schema():

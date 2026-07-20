@@ -131,9 +131,9 @@ def test_empty_sample_values_remain_unknown(tmp_path):
     empty = samples.loc[("02", "D1", "B4")]
 
     assert pd.isna(result.loc["02", ("D1", "B4", "recorded_sample")])
-    assert not empty["observed"]
     assert pd.isna(empty["sampling_time"])
     assert pd.isna(empty["sample_mismatch"])
+    assert "observed" not in samples
 
 
 def test_load_study_results_supports_multiple_days_and_ignores_google_fit(tmp_path):

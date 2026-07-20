@@ -11,7 +11,6 @@ _SUMMARY_INDEX = ["participant", "day", "scheduled_sample"]
 _RAW_LOG_INDEX = ["participant", "date", "scheduled_sample"]
 _SALIVA_INDEX = ["subject", "sample"]
 _PROVENANCE_COLUMNS = {
-    "sample_id_source",
     "merge_status",
     "mismatch_corrected",
 }
@@ -71,14 +70,8 @@ def merge_saliva(
     recorded = _clean_identifier(events["recorded_sample"])
     if correct_swaps:
         events["_match_sample"] = recorded.fillna(events["scheduled_sample"])
-        events["_sample_id_source"] = pd.Series(
-            "study_schedule", index=events.index, dtype="string"
-        ).mask(recorded.notna(), "app_record")
     else:
         events["_match_sample"] = events["scheduled_sample"]
-        events["_sample_id_source"] = pd.array(
-            ["study_schedule"] * len(events), dtype="string"
-        )
 
     _validate_event_matches(events)
     laboratory = laboratory.rename(
@@ -95,7 +88,6 @@ def merge_saliva(
     ).sort_values("_event_row", kind="stable")
 
     matched = merged["_merge_source"].eq("both")
-    merged["sample_id_source"] = merged["_sample_id_source"].where(matched, pd.NA)
     merged["merge_status"] = pd.array(
         matched.map({True: "matched", False: "unmatched"}), dtype="string"
     )
@@ -118,7 +110,6 @@ def merge_saliva(
         "_event_row",
         "_saliva_row",
         "_match_sample",
-        "_sample_id_source",
         "_merge_source",
         "_matched_sample",
     ]

@@ -130,11 +130,6 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
                     participant,
                     (day, sample, "sampling_time"),
                 )
-                barcode = _summary_value(
-                    summary,
-                    participant,
-                    (day, sample, "barcode"),
-                )
                 recorded_sample = _summary_value(
                     summary,
                     participant,
@@ -146,9 +141,6 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
                         "time_min": _minutes_between(sampling_time, awakening_time),
                         "recorded_sample": recorded_sample,
                         "sample_mismatch": _sample_mismatch(sample, recorded_sample),
-                        "observed": not (
-                            pd.isna(sampling_time) and _is_missing(barcode)
-                        ),
                     }
                 )
                 index.append((participant, day, sample))
@@ -163,12 +155,10 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
             "time_min",
             "recorded_sample",
             "sample_mismatch",
-            "observed",
         ],
     )
     result["recorded_sample"] = pd.array(result["recorded_sample"], dtype="string")
     result["sample_mismatch"] = pd.array(result["sample_mismatch"], dtype="boolean")
-    result["observed"] = pd.array(result["observed"], dtype="boolean")
     return result
 
 

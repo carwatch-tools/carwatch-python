@@ -77,7 +77,6 @@ print(
             "time_min",
             "recorded_sample",
             "cortisol",
-            "sample_id_source",
             "mismatch_corrected",
         ]
     ]

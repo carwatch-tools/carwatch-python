@@ -38,10 +38,10 @@ def test_merge_saliva_corrects_swaps_from_summary(tmp_path):
 
     assert result.index.names == ["participant", "day", "scheduled_sample"]
     assert result["cortisol"].tolist() == [1.0, 3.0, 2.0, 4.0]
-    assert result["sample_id_source"].tolist() == ["app_record"] * 4
     assert result["mismatch_corrected"].tolist() == [False, True, True, False]
     assert "saliva_sample" not in result
     assert "barcode" not in result
+    assert "sample_id_source" not in result
     assert "time_min" in result
 
 
@@ -69,18 +69,16 @@ def test_merge_saliva_can_skip_swap_correction(tmp_path):
     )
 
     assert result["cortisol"].tolist() == [1.0, 2.0, 3.0, 4.0]
-    assert result["sample_id_source"].tolist() == ["study_schedule"] * 4
     assert not result["mismatch_corrected"].any()
 
 
-def test_merge_saliva_uses_scheduled_sample_if_app_record_is_missing(tmp_path):
+def test_merge_saliva_uses_scheduled_sample_if_recorded_sample_is_missing(tmp_path):
     events = _summary_events(tmp_path)
     events.loc[("02", "D1", "B1"), "recorded_sample"] = pd.NA
 
     result = cw.merge_saliva(events, _saliva(tmp_path))
 
     assert result.loc[("02", "D1", "B1"), "cortisol"] == 1.0
-    assert result.loc[("02", "D1", "B1"), "sample_id_source"] == "study_schedule"
 
 
 def test_merge_saliva_distinguishes_missing_value_from_unmatched_sample(tmp_path):

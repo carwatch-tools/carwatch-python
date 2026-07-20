@@ -38,3 +38,5 @@ def test_import_example_runs_with_synthetic_data():
         True,
         False,
     ]
+    assert namespace["merged_samples"]["sampling_event_recorded"].all()
+    assert namespace["merged_samples"]["lab_value_available"].all()

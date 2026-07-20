@@ -39,6 +39,8 @@ def test_merge_saliva_corrects_swaps_from_summary(tmp_path):
     assert result.index.names == ["participant", "day", "scheduled_sample"]
     assert result["cortisol"].tolist() == [1.0, 3.0, 2.0, 4.0]
     assert result["mismatch_corrected"].tolist() == [False, True, True, False]
+    assert result["sampling_event_recorded"].all()
+    assert result["lab_value_available"].all()
     assert "saliva_sample" not in result
     assert "barcode" not in result
     assert "sample_id_source" not in result
@@ -57,8 +59,10 @@ def test_merge_saliva_supports_raw_log_sample_events(tmp_path):
     result = cw.merge_saliva(events, _saliva(tmp_path))
 
     assert result.index.names == ["participant", "date", "scheduled_sample"]
-    assert result["cortisol"].tolist() == [1.0, 3.0]
-    assert result["mismatch_corrected"].tolist() == [False, True]
+    assert result["cortisol"].tolist() == [1.0, 3.0, 2.0, 4.0]
+    assert result["sampling_event_recorded"].tolist() == [True, True, False, False]
+    assert result["lab_value_available"].tolist() == [True, True, True, True]
+    assert result["mismatch_corrected"].tolist() == [False, True, False, False]
 
 
 def test_merge_saliva_can_skip_swap_correction(tmp_path):
@@ -81,25 +85,65 @@ def test_merge_saliva_uses_scheduled_sample_if_recorded_sample_is_missing(tmp_pa
     assert result.loc[("02", "D1", "B1"), "cortisol"] == 1.0
 
 
-def test_merge_saliva_distinguishes_missing_value_from_unmatched_sample(tmp_path):
-    content = SALIVA.replace("02,B1,1.0", "02,B1,").replace("02,B4,4.0\n", "")
+@pytest.fixture
+def availability_cases(tmp_path):
+    log_path = tmp_path / "carwatch_logs_02.csv"
+    log_path.write_text(
+        '1747282435999;local;barcode_scanned;{"sample_expected":"B1","sample_scanned":"B1"}\n'
+        '1747284231091;local;barcode_scanned;{"sample_expected":"B2","sample_scanned":"B2"}\n'
+    )
+    saliva = _saliva(
+        tmp_path,
+        """subject,sample,cortisol
+02,B1,1.0
+02,B2,
+02,B3,3.0
+02,B4,
+""",
+    )
+    events = cw.logs.extract_sample_events_from_raw_logs(cw.io.load_logs(log_path))
+    return cw.merge_saliva(events, saliva).reset_index().set_index("scheduled_sample")
 
-    result = cw.merge_saliva(_summary_events(tmp_path), _saliva(tmp_path, content))
 
-    assert result.loc[("02", "D1", "B1"), "merge_status"] == "matched"
-    assert pd.isna(result.loc[("02", "D1", "B1"), "cortisol"])
-    assert result.loc[("02", "D1", "B4"), "merge_status"] == "unmatched"
+def test_merge_marks_recorded_event_with_lab_value(availability_cases):
+    result = availability_cases.loc["B1"]
+
+    assert bool(result["sampling_event_recorded"])
+    assert bool(result["lab_value_available"])
 
 
-def test_merge_saliva_can_require_complete_matching(tmp_path):
-    content = SALIVA.replace("02,B4,4.0\n", "")
+def test_merge_marks_recorded_event_without_lab_value(availability_cases):
+    result = availability_cases.loc["B2"]
 
-    with pytest.raises(MergeError, match="unmatched"):
-        cw.merge_saliva(
-            _summary_events(tmp_path),
-            _saliva(tmp_path, content),
-            allow_unmatched=False,
-        )
+    assert bool(result["sampling_event_recorded"])
+    assert not bool(result["lab_value_available"])
+    assert pd.isna(result["cortisol"])
+
+
+def test_merge_marks_missing_event_with_lab_value(availability_cases):
+    result = availability_cases.loc["B3"]
+
+    assert not bool(result["sampling_event_recorded"])
+    assert bool(result["lab_value_available"])
+    assert result["cortisol"] == 3.0
+
+
+def test_merge_marks_missing_event_without_lab_value(availability_cases):
+    result = availability_cases.loc["B4"]
+
+    assert not bool(result["sampling_event_recorded"])
+    assert not bool(result["lab_value_available"])
+    assert pd.isna(result["cortisol"])
+
+
+def test_merge_preserves_missing_summary_event(tmp_path):
+    events = _summary_events(tmp_path)
+    events.loc[("02", "D1", "B4"), "sampling_event_recorded"] = False
+
+    result = cw.merge_saliva(events, _saliva(tmp_path))
+
+    assert not result.loc[("02", "D1", "B4"), "sampling_event_recorded"]
+    assert result.loc[("02", "D1", "B4"), "lab_value_available"]
 
 
 def test_merge_saliva_rejects_non_bijective_swaps(tmp_path):
@@ -120,9 +164,7 @@ def test_merge_saliva_rejects_duplicate_sampling_positions(tmp_path):
 
 def test_merge_saliva_rejects_incompatible_schemas(tmp_path):
     with pytest.raises(SchemaError, match="sample extractor"):
-        cw.merge_saliva(
-            pd.DataFrame({"scheduled_sample": ["B1"]}), _saliva(tmp_path)
-        )
+        cw.merge_saliva(pd.DataFrame({"scheduled_sample": ["B1"]}), _saliva(tmp_path))
     with pytest.raises(SchemaError, match="index levels"):
         cw.merge_saliva(_summary_events(tmp_path), pd.DataFrame({"cortisol": [1.0]}))
 

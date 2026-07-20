@@ -111,6 +111,7 @@ def test_extract_sample_events_from_summary_derives_sample_fields(tmp_path):
         "B4",
     ]
     assert samples["sample_mismatch"].tolist() == [False, True, True, False]
+    assert samples["sampling_event_recorded"].tolist() == [True, True, True, True]
     assert samples.loc[("02", "D1", "B1"), "time_min"] == pytest.approx(25 / 60)
     assert "barcode" not in samples
     assert "awakening_time" not in samples
@@ -133,6 +134,7 @@ def test_empty_sample_values_remain_unknown(tmp_path):
     assert pd.isna(result.loc["02", ("D1", "B4", "recorded_sample")])
     assert pd.isna(empty["sampling_time"])
     assert pd.isna(empty["sample_mismatch"])
+    assert not empty["sampling_event_recorded"]
     assert "observed" not in samples
 
 

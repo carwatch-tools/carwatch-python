@@ -58,6 +58,7 @@ def extract_sample_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFrame:
                 "day_scanned": payload.get("day_scanned"),
                 "scheduled_sample": scheduled_sample,
                 "recorded_sample": recorded_sample,
+                "sampling_event_recorded": True,
                 "sample_mismatch": bool(
                     scheduled_sample
                     and recorded_sample
@@ -135,11 +136,20 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
                     participant,
                     (day, sample, "recorded_sample"),
                 )
+                barcode = _summary_value_or_na(
+                    summary,
+                    participant,
+                    (day, sample, "barcode"),
+                )
                 rows.append(
                     {
                         "sampling_time": sampling_time,
                         "time_min": _minutes_between(sampling_time, awakening_time),
                         "recorded_sample": recorded_sample,
+                        "sampling_event_recorded": any(
+                            pd.notna(value)
+                            for value in (sampling_time, recorded_sample, barcode)
+                        ),
                         "sample_mismatch": _sample_mismatch(sample, recorded_sample),
                     }
                 )
@@ -154,10 +164,12 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
             "sampling_time",
             "time_min",
             "recorded_sample",
+            "sampling_event_recorded",
             "sample_mismatch",
         ],
     )
     result["recorded_sample"] = pd.array(result["recorded_sample"], dtype="string")
+    result["sampling_event_recorded"] = result["sampling_event_recorded"].astype(bool)
     result["sample_mismatch"] = pd.array(result["sample_mismatch"], dtype="boolean")
     return result
 
@@ -252,6 +264,12 @@ def _samples(summary: pd.DataFrame, day: str) -> list[str]:
 def _summary_value(summary: pd.DataFrame, participant, column: tuple):
     if column not in summary.columns:
         raise SchemaError(f"Study summary is missing required column: {column}")
+    return summary.at[participant, column]
+
+
+def _summary_value_or_na(summary: pd.DataFrame, participant, column: tuple):
+    if column not in summary.columns:
+        return pd.NA
     return summary.at[participant, column]
 
 

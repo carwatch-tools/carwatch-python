@@ -11,8 +11,9 @@ _SUMMARY_INDEX = ["participant", "day", "scheduled_sample"]
 _RAW_LOG_INDEX = ["participant", "date", "scheduled_sample"]
 _SALIVA_INDEX = ["subject", "sample"]
 _PROVENANCE_COLUMNS = {
-    "merge_status",
+    "lab_value_available",
     "mismatch_corrected",
+    "sampling_event_recorded",
 }
 
 
@@ -21,7 +22,6 @@ def merge_saliva(
     saliva: pd.DataFrame,
     *,
     correct_swaps: bool = True,
-    allow_unmatched: bool = True,
 ) -> pd.DataFrame:
     """Merge laboratory measurements onto CARWatch sample events.
 
@@ -42,15 +42,12 @@ def merge_saliva(
     correct_swaps
         Match laboratory tubes using ``recorded_sample``. Set to ``False`` to
         merge measurements by ``scheduled_sample`` instead.
-    allow_unmatched
-        Retain unmatched events and unused laboratory measurements if ``True``.
-        If ``False``, an incomplete merge raises
-        :class:`carwatch.exceptions.MergeError`.
-
     Returns
     -------
     pandas.DataFrame
-        Sample events enriched with saliva measurements and merge provenance.
+        CARWatch sampling positions and laboratory samples combined with two
+        independent availability flags: ``sampling_event_recorded`` and
+        ``lab_value_available``. Rows from both inputs are retained.
         Summary events retain a
         ``participant``/``day``/``scheduled_sample`` index; raw log events use
         ``participant``/``date``/``scheduled_sample``.
@@ -58,15 +55,12 @@ def merge_saliva(
     """
     if not isinstance(correct_swaps, bool):
         raise TypeError("'correct_swaps' must be a boolean.")
-    if not isinstance(allow_unmatched, bool):
-        raise TypeError("'allow_unmatched' must be a boolean.")
 
     events, index_columns = _normalize_sample_events(sample_events)
     laboratory, measurement_columns = _normalize_saliva(saliva)
     _validate_output_columns(events, measurement_columns)
 
     events["_event_row"] = range(len(events))
-    laboratory["_saliva_row"] = range(len(laboratory))
     recorded = _clean_identifier(events["recorded_sample"])
     if correct_swaps:
         events["_match_sample"] = recorded.fillna(events["scheduled_sample"])
@@ -79,36 +73,31 @@ def merge_saliva(
     )
     merged = events.merge(
         laboratory,
-        how="left",
+        how="outer",
         left_on=["participant", "_match_sample"],
         right_on=["participant", "_matched_sample"],
         sort=False,
         validate="one_to_one",
         indicator="_merge_source",
-    ).sort_values("_event_row", kind="stable")
+    ).sort_values("_event_row", kind="stable", na_position="last")
+
+    merged["scheduled_sample"] = _clean_identifier(merged["scheduled_sample"]).fillna(
+        merged["_matched_sample"]
+    )
+    merged["sampling_event_recorded"] = (
+        merged["sampling_event_recorded"].astype("boolean").fillna(False).astype(bool)
+    )
+    merged["lab_value_available"] = merged[measurement_columns].notna().all(axis=1)
 
     matched = merged["_merge_source"].eq("both")
-    merged["merge_status"] = pd.array(
-        matched.map({True: "matched", False: "unmatched"}), dtype="string"
-    )
     if correct_swaps:
         corrected = matched & merged["scheduled_sample"].ne(merged["_matched_sample"])
         merged["mismatch_corrected"] = corrected.fillna(False).astype(bool)
     else:
         merged["mismatch_corrected"] = False
 
-    unused_saliva = set(laboratory["_saliva_row"]) - set(
-        merged.loc[matched, "_saliva_row"].astype(int)
-    )
-    if not allow_unmatched and ((~matched).any() or unused_saliva):
-        raise exceptions.MergeError(
-            f"Merge left {int((~matched).sum())} sample events unmatched and "
-            f"{len(unused_saliva)} saliva measurements unused."
-        )
-
     helper_columns = [
         "_event_row",
-        "_saliva_row",
         "_match_sample",
         "_merge_source",
         "_matched_sample",
@@ -139,10 +128,22 @@ def _normalize_sample_events(
             "Sample events must come from a raw-log or summary sample extractor."
         )
 
-    missing = {"recorded_sample"}.difference(events.columns)
+    missing = {"recorded_sample", "sampling_event_recorded"}.difference(events.columns)
     if missing:
         raise exceptions.SchemaError(
             f"Sample events are missing required columns: {sorted(missing)}"
+        )
+    try:
+        events["sampling_event_recorded"] = events["sampling_event_recorded"].astype(
+            "boolean"
+        )
+    except (TypeError, ValueError) as error:
+        raise exceptions.SchemaError(
+            "Column 'sampling_event_recorded' must contain boolean values."
+        ) from error
+    if events["sampling_event_recorded"].isna().any():
+        raise exceptions.SchemaError(
+            "Column 'sampling_event_recorded' contains missing values."
         )
     for column in ["participant", "scheduled_sample"]:
         events[column] = _clean_identifier(events[column])

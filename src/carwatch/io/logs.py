@@ -78,7 +78,7 @@ def load_logs(
 
 
 def _normalize_paths(path: PathLike | Sequence[PathLike]) -> list[Path]:
-    if isinstance(path, str | Path):
+    if isinstance(path, (str, Path)):
         paths = [Path(path)]
     else:
         paths = [Path(item) for item in path]

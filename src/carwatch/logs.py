@@ -105,6 +105,7 @@ def _expected_sample(payload: dict) -> str | None:
     saliva_id = payload.get("saliva_id")
     if saliva_id is None:
         return None
+    # Special-case known legacy ID that maps to the "SE" sampling position.
     if payload.get("id") == 815:
         return "SE"
     return f"S{saliva_id}"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
-from carwatch.exceptions import MergeError, SchemaError
+import carwatch.exceptions as exceptions
 
 _SUMMARY_INDEX = ["participant", "day", "sample"]
 _RAW_LOG_INDEX = ["participant", "date", "sample"]
@@ -109,7 +109,7 @@ def merge_saliva(
         merged.loc[matched, "_saliva_row"].astype(int)
     )
     if not allow_unmatched and ((~matched).any() or unused_saliva):
-        raise MergeError(
+        raise exceptions.MergeError(
             f"Merge left {int((~matched).sum())} sample events unmatched and "
             f"{len(unused_saliva)} saliva measurements unused."
         )
@@ -130,7 +130,7 @@ def _normalize_sample_events(
     if not isinstance(sample_events, pd.DataFrame):
         raise TypeError("'sample_events' must be a pandas DataFrame.")
     if sample_events.empty:
-        raise SchemaError("Sample events must not be empty.")
+        raise exceptions.SchemaError("Sample events must not be empty.")
 
     index_names = list(sample_events.index.names)
     if index_names in [_SUMMARY_INDEX, _RAW_LOG_INDEX]:
@@ -143,27 +143,27 @@ def _normalize_sample_events(
         events = sample_events.copy()
         index_columns = _RAW_LOG_INDEX
     else:
-        raise SchemaError(
+        raise exceptions.SchemaError(
             "Sample events must come from a raw-log or summary sample extractor."
         )
 
     missing = {"sample_scanned"}.difference(events.columns)
     if missing:
-        raise SchemaError(
+        raise exceptions.SchemaError(
             f"Sample events are missing required columns: {sorted(missing)}"
         )
     for column in ["participant", "sample"]:
         events[column] = _clean_identifier(events[column])
     for column in index_columns:
         if events[column].isna().any():
-            raise SchemaError(
+            raise exceptions.SchemaError(
                 f"Sample event index column {column!r} contains missing values."
             )
     if events.duplicated(index_columns).any():
         duplicates = events.loc[
             events.duplicated(index_columns, keep=False), index_columns
         ]
-        raise SchemaError(
+        raise exceptions.SchemaError(
             "Sample events contain duplicate sampling positions: "
             f"{duplicates.drop_duplicates().to_dict(orient='records')}"
         )
@@ -174,27 +174,33 @@ def _normalize_saliva(saliva: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     if not isinstance(saliva, pd.DataFrame):
         raise TypeError("'saliva' must be a pandas DataFrame.")
     if list(saliva.index.names) != _SALIVA_INDEX:
-        raise SchemaError(
+        raise exceptions.SchemaError(
             f"Saliva data require index levels {_SALIVA_INDEX}, got {saliva.index.names}."
         )
     if saliva.empty:
-        raise SchemaError("Saliva data must not be empty.")
+        raise exceptions.SchemaError("Saliva data must not be empty.")
     measurement_columns = saliva.columns.tolist()
     if not measurement_columns:
-        raise SchemaError("Saliva data do not contain a measurement column.")
+        raise exceptions.SchemaError("Saliva data do not contain a measurement column.")
     non_numeric = [
         column for column in measurement_columns if not is_numeric_dtype(saliva[column])
     ]
     if non_numeric:
-        raise SchemaError(f"Saliva measurement columns must be numeric: {non_numeric}")
+        raise exceptions.SchemaError(
+            f"Saliva measurement columns must be numeric: {non_numeric}"
+        )
 
     laboratory = saliva.reset_index().copy()
     for column in _SALIVA_INDEX:
         laboratory[column] = _clean_identifier(laboratory[column])
         if laboratory[column].isna().any():
-            raise SchemaError(f"Saliva index level {column!r} contains missing values.")
+            raise exceptions.SchemaError(
+                f"Saliva index level {column!r} contains missing values."
+            )
     if laboratory.duplicated(_SALIVA_INDEX).any():
-        raise SchemaError("Saliva data contain duplicate subject/sample pairs.")
+        raise exceptions.SchemaError(
+            "Saliva data contain duplicate subject/sample pairs."
+        )
     return laboratory, measurement_columns
 
 
@@ -202,7 +208,7 @@ def _validate_output_columns(events: pd.DataFrame, measurements: list[str]) -> N
     output_columns = set(events.columns).union(_PROVENANCE_COLUMNS)
     conflicts = set(measurements).intersection(output_columns)
     if conflicts:
-        raise SchemaError(
+        raise exceptions.SchemaError(
             f"Saliva measurement columns conflict with merge output: {sorted(conflicts)}"
         )
 
@@ -212,7 +218,7 @@ def _validate_event_matches(events: pd.DataFrame) -> None:
     duplicates = events.duplicated(match_columns, keep=False)
     if duplicates.any():
         values = events.loc[duplicates, match_columns].drop_duplicates()
-        raise MergeError(
+        raise exceptions.MergeError(
             "Multiple sample events refer to the same physical saliva tube: "
             f"{values.to_dict(orient='records')}"
         )

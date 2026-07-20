@@ -1,0 +1,5 @@
+1747282410799;Thu May 15 2025 06:13:30 GMT+02:00;spontaneous_awakening;{"id":0}
+1747282435999;Thu May 15 2025 06:13:55 GMT+02:00;barcode_scanned;{"id":0,"saliva_id":100,"barcode_value":"0010101","day_scanned":1,"day_expected":1,"sample_scanned":"B1","sample_expected":"B1"}
+1747284231091;Thu May 15 2025 06:43:51 GMT+02:00;barcode_scanned;{"id":1,"saliva_id":101,"barcode_value":"0010103","day_scanned":1,"day_expected":1,"sample_scanned":"B3","sample_expected":"B2"}
+1747285132000;Thu May 15 2025 06:58:52 GMT+02:00;barcode_scanned;{"id":2,"saliva_id":102,"barcode_value":"0010102","day_scanned":1,"day_expected":1,"sample_scanned":"B2","sample_expected":"B3"}
+1747286027000;Thu May 15 2025 07:13:47 GMT+02:00;barcode_scanned;{"id":3,"saliva_id":103,"barcode_value":"0010104","day_scanned":1,"day_expected":1,"sample_scanned":"B4","sample_expected":"B4"}

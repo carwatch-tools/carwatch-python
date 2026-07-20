@@ -22,16 +22,13 @@ _ENTRY_START = re.compile(r"^\d+;")
 _ACTION = re.compile(r"^[a-z][a-z0-9_]*$")
 _DATE_TOKEN = re.compile(r"^\d{8}$")
 _COLUMNS = [
-    "study",
     "participant",
     "date",
     "timestamp",
     "timestamp_ms",
-    "timestamp_recorded",
     "action",
     "payload",
     "source_file",
-    "event_index",
 ]
 
 
@@ -71,7 +68,7 @@ def load_logs(
 
     result = pd.concat(frames, ignore_index=True)
     return result.sort_values(
-        ["study", "participant", "timestamp", "source_file", "event_index"],
+        ["participant", "timestamp", "source_file"],
         kind="stable",
         na_position="last",
     ).reset_index(drop=True)
@@ -157,14 +154,13 @@ def _load_text(
             errors=errors,
         )
 
-    study, participant, file_date = _metadata_from_filename(source_file)
+    participant, file_date = _metadata_from_filename(source_file)
     result.insert(0, "participant", participant)
-    result.insert(0, "study", study)
     if file_date is None:
         file_date = result["timestamp"].iloc[0].normalize()
     else:
         file_date = pd.Timestamp(file_date, tz=tz)
-    result.insert(2, "date", file_date)
+    result.insert(1, "date", file_date)
     return result[_COLUMNS]
 
 
@@ -197,12 +193,11 @@ def _parse_entry(
 
     timestamp_raw = parts[0]
     if len(parts) == 4:
-        timestamp_recorded, action, payload_raw = parts[1:]
+        _, action, payload_raw = parts[1:]
     elif _ACTION.fullmatch(parts[1]):
-        timestamp_recorded = None
         action, payload_raw = parts[1:]
     else:
-        timestamp_recorded, action = parts[1:]
+        _, action = parts[1:]
         payload_raw = "{}"
 
     try:
@@ -219,11 +214,9 @@ def _parse_entry(
     return {
         "timestamp": timestamp,
         "timestamp_ms": timestamp_ms,
-        "timestamp_recorded": timestamp_recorded,
         "action": action,
         "payload": payload,
         "source_file": source_file,
-        "event_index": event_index,
     }
 
 
@@ -254,7 +247,7 @@ def _parse_payload(
 
 def _metadata_from_filename(
     source_file: str,
-) -> tuple[str | None, str | None, str | None]:
+) -> tuple[str | None, str | None]:
     file_name = Path(source_file.split("!", maxsplit=1)[-1]).name
     stem = re.sub(r"\.csv$", "", file_name, flags=re.IGNORECASE)
     stem = re.sub(r"^carwatch_", "", stem, flags=re.IGNORECASE)
@@ -263,10 +256,10 @@ def _metadata_from_filename(
     date = _date_token_to_iso(parts[-1]) if has_date else None
     content = parts[:-1] if has_date else parts
     if len(content) >= 2:
-        return content[0], "_".join(content[1:]), date
+        return "_".join(content[1:]), date
     if content:
-        return None, content[0], date
-    return None, None, date
+        return content[0], date
+    return None, date
 
 
 def _date_token_to_iso(value: str) -> str:

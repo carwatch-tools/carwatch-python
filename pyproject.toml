@@ -42,11 +42,16 @@ docs = { "script" = "_tasks:task_docs()",  help = "Build the html docs using Sph
 docs_clean = { "script" = "_tasks:task_docs(clean=True)",  help = "Remove all old build files and build a clean version of the docs." }
 docs_preview = { cmd = "python -m http.server --directory docs/_build/html", help = "Preview the built html docs." }
 version = { script = "_tasks:task_update_version()" }
+conf_jupyter = { cmd = "python -m ipykernel install --user --name carwatch --display-name carwatch", help = "Add a new jupyter kernel for the project." }
+remove_jupyter = { cmd = "jupyter kernelspec uninstall carwatch", help = "Remove the project specific jupyter kernel." }
+
 
 [dependency-groups]
 dev = [
+    "ipykernel>=6,<7",
     "matplotlib>=3.10.9",
     "memory-profiler>=0.61.0",
+    "nbconvert>=7,<8",
     "numpydoc>=1.10.0",
     "poethepoet>=0.48.0",
     "pytest>=9.1.1",

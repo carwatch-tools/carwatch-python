@@ -36,9 +36,9 @@ def _saliva(tmp_path, content=SALIVA):
 def test_merge_saliva_corrects_swaps_from_summary(tmp_path):
     result = cw.merge_saliva(_summary_events(tmp_path), _saliva(tmp_path))
 
-    assert result.index.names == ["participant", "day", "sample"]
+    assert result.index.names == ["participant", "day", "scheduled_sample"]
     assert result["cortisol"].tolist() == [1.0, 3.0, 2.0, 4.0]
-    assert result["match_method"].tolist() == ["sample_scanned"] * 4
+    assert result["sample_id_source"].tolist() == ["app_record"] * 4
     assert result["mismatch_corrected"].tolist() == [False, True, True, False]
     assert "saliva_sample" not in result
     assert "barcode" not in result
@@ -56,7 +56,7 @@ def test_merge_saliva_supports_raw_log_sample_events(tmp_path):
 
     result = cw.merge_saliva(events, _saliva(tmp_path))
 
-    assert result.index.names == ["participant", "date", "sample"]
+    assert result.index.names == ["participant", "date", "scheduled_sample"]
     assert result["cortisol"].tolist() == [1.0, 3.0]
     assert result["mismatch_corrected"].tolist() == [False, True]
 
@@ -69,18 +69,18 @@ def test_merge_saliva_can_skip_swap_correction(tmp_path):
     )
 
     assert result["cortisol"].tolist() == [1.0, 2.0, 3.0, 4.0]
-    assert result["match_method"].tolist() == ["expected_sample"] * 4
+    assert result["sample_id_source"].tolist() == ["study_schedule"] * 4
     assert not result["mismatch_corrected"].any()
 
 
-def test_merge_saliva_uses_expected_sample_if_scan_is_missing(tmp_path):
+def test_merge_saliva_uses_scheduled_sample_if_app_record_is_missing(tmp_path):
     events = _summary_events(tmp_path)
-    events.loc[("02", "D1", "B1"), "sample_scanned"] = pd.NA
+    events.loc[("02", "D1", "B1"), "recorded_sample"] = pd.NA
 
     result = cw.merge_saliva(events, _saliva(tmp_path))
 
     assert result.loc[("02", "D1", "B1"), "cortisol"] == 1.0
-    assert result.loc[("02", "D1", "B1"), "match_method"] == "expected_sample"
+    assert result.loc[("02", "D1", "B1"), "sample_id_source"] == "study_schedule"
 
 
 def test_merge_saliva_distinguishes_missing_value_from_unmatched_sample(tmp_path):
@@ -106,7 +106,7 @@ def test_merge_saliva_can_require_complete_matching(tmp_path):
 
 def test_merge_saliva_rejects_non_bijective_swaps(tmp_path):
     events = _summary_events(tmp_path)
-    events.loc[("02", "D1", "B2"), "sample_scanned"] = "B1"
+    events.loc[("02", "D1", "B2"), "recorded_sample"] = "B1"
 
     with pytest.raises(MergeError, match="same physical saliva tube"):
         cw.merge_saliva(events, _saliva(tmp_path))
@@ -122,7 +122,9 @@ def test_merge_saliva_rejects_duplicate_sampling_positions(tmp_path):
 
 def test_merge_saliva_rejects_incompatible_schemas(tmp_path):
     with pytest.raises(SchemaError, match="sample extractor"):
-        cw.merge_saliva(pd.DataFrame({"sample": ["B1"]}), _saliva(tmp_path))
+        cw.merge_saliva(
+            pd.DataFrame({"scheduled_sample": ["B1"]}), _saliva(tmp_path)
+        )
     with pytest.raises(SchemaError, match="index levels"):
         cw.merge_saliva(_summary_events(tmp_path), pd.DataFrame({"cortisol": [1.0]}))
 

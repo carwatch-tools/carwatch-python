@@ -106,8 +106,8 @@ def test_extract_sample_events_from_raw_logs_marks_swapped_tube(tmp_path):
 
     samples = cw.logs.extract_sample_events_from_raw_logs(cw.io.load_logs(path))
 
-    assert samples["sample"].tolist() == ["B1", "B2"]
-    assert samples["sample_scanned"].tolist() == ["B1", "B3"]
+    assert samples["scheduled_sample"].tolist() == ["B1", "B2"]
+    assert samples["recorded_sample"].tolist() == ["B1", "B3"]
     assert samples["sample_mismatch"].tolist() == [False, True]
     assert "barcode" not in samples
     assert "study" not in samples

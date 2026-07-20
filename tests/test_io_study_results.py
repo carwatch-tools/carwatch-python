@@ -31,16 +31,16 @@ def test_load_study_results_returns_wide_multiindex_columns(tmp_path):
         ("D1", "day", "mismatch_summary"),
         ("D1", "B1", "sampling_time"),
         ("D1", "B1", "barcode"),
-        ("D1", "B1", "sample_scanned"),
+        ("D1", "B1", "recorded_sample"),
         ("D1", "B2", "sampling_time"),
         ("D1", "B2", "barcode"),
-        ("D1", "B2", "sample_scanned"),
+        ("D1", "B2", "recorded_sample"),
         ("D1", "B3", "sampling_time"),
         ("D1", "B3", "barcode"),
-        ("D1", "B3", "sample_scanned"),
+        ("D1", "B3", "recorded_sample"),
         ("D1", "B4", "sampling_time"),
         ("D1", "B4", "barcode"),
-        ("D1", "B4", "sample_scanned"),
+        ("D1", "B4", "recorded_sample"),
     ]
     assert result[("D1", "B1", "barcode")].tolist() == ["0010101"]
 
@@ -48,8 +48,8 @@ def test_load_study_results_returns_wide_multiindex_columns(tmp_path):
 def test_load_study_results_preserves_day_level_mismatch_summary(tmp_path):
     result = cw.io.load_study_results(_write_csv(tmp_path))
 
-    assert result.loc["02", ("D1", "B2", "sample_scanned")] == "B3"
-    assert result.loc["02", ("D1", "B3", "sample_scanned")] == "B2"
+    assert result.loc["02", ("D1", "B2", "recorded_sample")] == "B3"
+    assert result.loc["02", ("D1", "B3", "recorded_sample")] == "B2"
     assert result.loc["02", ("D1", "day", "mismatch_summary")] == "B2->B3;B3->B2"
 
 
@@ -103,8 +103,8 @@ def test_extract_sample_events_from_summary_derives_sample_fields(tmp_path):
 
     samples = cw.logs.extract_sample_events_from_summary(result)
 
-    assert samples.index.names == ["participant", "day", "sample"]
-    assert samples.index.get_level_values("sample").tolist() == [
+    assert samples.index.names == ["participant", "day", "scheduled_sample"]
+    assert samples.index.get_level_values("scheduled_sample").tolist() == [
         "B1",
         "B2",
         "B3",
@@ -130,7 +130,7 @@ def test_empty_sample_values_remain_unknown(tmp_path):
     samples = cw.logs.extract_sample_events_from_summary(result)
     empty = samples.loc[("02", "D1", "B4")]
 
-    assert pd.isna(result.loc["02", ("D1", "B4", "sample_scanned")])
+    assert pd.isna(result.loc["02", ("D1", "B4", "recorded_sample")])
     assert not empty["observed"]
     assert pd.isna(empty["sampling_time"])
     assert pd.isna(empty["sample_mismatch"])

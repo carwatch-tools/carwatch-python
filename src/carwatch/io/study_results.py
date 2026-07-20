@@ -21,7 +21,7 @@ _DAY_VARIABLES = (
     "awakening_type",
     "mismatch_summary",
 )
-_SAMPLE_VARIABLES = ("sampling_time", "barcode", "sample_scanned")
+_SAMPLE_VARIABLES = ("sampling_time", "barcode", "recorded_sample")
 _COLUMN_LEVELS = ["day", "sample", "variable"]
 
 
@@ -136,7 +136,7 @@ def _normalize_participant(
             normalized[(day, sample, "barcode")] = _get_value(
                 source_row, columns, f"sample_barcode_d{day_number}_{sample}"
             )
-            normalized[(day, sample, "sample_scanned")] = _get_value(
+            normalized[(day, sample, "recorded_sample")] = _get_value(
                 source_row, columns, f"sample_scanned_d{day_number}_{sample}"
             )
     return normalized
@@ -189,7 +189,7 @@ def _set_string_dtypes(data: pd.DataFrame) -> pd.DataFrame:
             "awakening_type",
             "mismatch_summary",
             "barcode",
-            "sample_scanned",
+            "recorded_sample",
         }:
             data[column] = pd.array(data[column], dtype="string")
     return data

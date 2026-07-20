@@ -7,11 +7,11 @@ from pandas.api.types import is_numeric_dtype
 
 import carwatch.exceptions as exceptions
 
-_SUMMARY_INDEX = ["participant", "day", "sample"]
-_RAW_LOG_INDEX = ["participant", "date", "sample"]
+_SUMMARY_INDEX = ["participant", "day", "scheduled_sample"]
+_RAW_LOG_INDEX = ["participant", "date", "scheduled_sample"]
 _SALIVA_INDEX = ["subject", "sample"]
 _PROVENANCE_COLUMNS = {
-    "match_method",
+    "sample_id_source",
     "merge_status",
     "mismatch_corrected",
 }
@@ -26,10 +26,10 @@ def merge_saliva(
 ) -> pd.DataFrame:
     """Merge laboratory measurements onto CARWatch sample events.
 
-    By default, each event is matched to the physical tube recorded in
-    ``sample_scanned``. This assigns accidentally swapped tubes to the sampling
-    position at which they were actually collected. If no scanned tube is
-    recorded, the expected ``sample`` is used as a fallback.
+    By default, each event is matched to ``recorded_sample`` from the app. This
+    assigns accidentally swapped tubes to the sampling position at which they
+    were actually collected. If no app record exists, ``scheduled_sample`` is
+    used as a fallback.
 
     Parameters
     ----------
@@ -41,8 +41,8 @@ def merge_saliva(
         Measurements returned by :func:`carwatch.io.load_saliva` with the
         ``subject`` and ``sample`` index levels.
     correct_swaps
-        Match laboratory tubes using ``sample_scanned``. Set to ``False`` to
-        merge measurements by the expected ``sample`` labels instead.
+        Match laboratory tubes using ``recorded_sample``. Set to ``False`` to
+        merge measurements by ``scheduled_sample`` instead.
     allow_unmatched
         Retain unmatched events and unused laboratory measurements if ``True``.
         If ``False``, an incomplete merge raises
@@ -52,8 +52,9 @@ def merge_saliva(
     -------
     pandas.DataFrame
         Sample events enriched with saliva measurements and merge provenance.
-        Summary events retain a ``participant``/``day``/``sample`` index; raw
-        log events use ``participant``/``date``/``sample``.
+        Summary events retain a
+        ``participant``/``day``/``scheduled_sample`` index; raw log events use
+        ``participant``/``date``/``scheduled_sample``.
 
     """
     if not isinstance(correct_swaps, bool):
@@ -67,16 +68,16 @@ def merge_saliva(
 
     events["_event_row"] = range(len(events))
     laboratory["_saliva_row"] = range(len(laboratory))
-    scanned = _clean_identifier(events["sample_scanned"])
+    recorded = _clean_identifier(events["recorded_sample"])
     if correct_swaps:
-        events["_match_sample"] = scanned.fillna(events["sample"])
-        events["_match_method"] = pd.Series(
-            "expected_sample", index=events.index, dtype="string"
-        ).mask(scanned.notna(), "sample_scanned")
+        events["_match_sample"] = recorded.fillna(events["scheduled_sample"])
+        events["_sample_id_source"] = pd.Series(
+            "study_schedule", index=events.index, dtype="string"
+        ).mask(recorded.notna(), "app_record")
     else:
-        events["_match_sample"] = events["sample"]
-        events["_match_method"] = pd.array(
-            ["expected_sample"] * len(events), dtype="string"
+        events["_match_sample"] = events["scheduled_sample"]
+        events["_sample_id_source"] = pd.array(
+            ["study_schedule"] * len(events), dtype="string"
         )
 
     _validate_event_matches(events)
@@ -94,12 +95,12 @@ def merge_saliva(
     ).sort_values("_event_row", kind="stable")
 
     matched = merged["_merge_source"].eq("both")
-    merged["match_method"] = merged["_match_method"].where(matched, pd.NA)
+    merged["sample_id_source"] = merged["_sample_id_source"].where(matched, pd.NA)
     merged["merge_status"] = pd.array(
         matched.map({True: "matched", False: "unmatched"}), dtype="string"
     )
     if correct_swaps:
-        corrected = matched & merged["sample"].ne(merged["_matched_sample"])
+        corrected = matched & merged["scheduled_sample"].ne(merged["_matched_sample"])
         merged["mismatch_corrected"] = corrected.fillna(False).astype(bool)
     else:
         merged["mismatch_corrected"] = False
@@ -117,7 +118,7 @@ def merge_saliva(
         "_event_row",
         "_saliva_row",
         "_match_sample",
-        "_match_method",
+        "_sample_id_source",
         "_merge_source",
         "_matched_sample",
     ]
@@ -147,12 +148,12 @@ def _normalize_sample_events(
             "Sample events must come from a raw-log or summary sample extractor."
         )
 
-    missing = {"sample_scanned"}.difference(events.columns)
+    missing = {"recorded_sample"}.difference(events.columns)
     if missing:
         raise exceptions.SchemaError(
             f"Sample events are missing required columns: {sorted(missing)}"
         )
-    for column in ["participant", "sample"]:
+    for column in ["participant", "scheduled_sample"]:
         events[column] = _clean_identifier(events[column])
     for column in index_columns:
         if events[column].isna().any():

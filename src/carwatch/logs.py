@@ -28,8 +28,8 @@ _DAY_VARIABLES = (
 def extract_sample_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFrame:
     """Extract barcode scans from raw CARWatch log events.
 
-    The returned ``sample`` is the expected sampling position, while
-    ``sample_scanned`` identifies the physical tube that was scanned.
+    ``scheduled_sample`` identifies the sample defined by the study schedule.
+    ``recorded_sample`` identifies the sample recorded by the app.
 
     Parameters
     ----------
@@ -47,8 +47,8 @@ def extract_sample_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict] = []
     for row in scans.itertuples(index=False):
         payload = row.payload or {}
-        expected = _expected_sample(payload)
-        scanned = payload.get("sample_scanned") or expected
+        scheduled_sample = _scheduled_sample(payload)
+        recorded_sample = payload.get("sample_scanned") or scheduled_sample
         rows.append(
             {
                 "participant": row.participant,
@@ -56,9 +56,13 @@ def extract_sample_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFrame:
                 "sampling_time": row.timestamp,
                 "day_expected": payload.get("day_expected"),
                 "day_scanned": payload.get("day_scanned"),
-                "sample": expected,
-                "sample_scanned": scanned,
-                "sample_mismatch": bool(expected and scanned and expected != scanned),
+                "scheduled_sample": scheduled_sample,
+                "recorded_sample": recorded_sample,
+                "sample_mismatch": bool(
+                    scheduled_sample
+                    and recorded_sample
+                    and scheduled_sample != recorded_sample
+                ),
                 "source_file": getattr(row, "source_file", None),
             }
         )
@@ -109,7 +113,7 @@ def extract_awakening_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFra
 
 
 def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
-    """Extract one row per expected sample from a Study Manager summary."""
+    """Extract one row per scheduled sample from a Study Manager summary."""
     _validate_summary(summary)
     rows: list[dict] = []
     index: list[tuple] = []
@@ -131,17 +135,17 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
                     participant,
                     (day, sample, "barcode"),
                 )
-                sample_scanned = _summary_value(
+                recorded_sample = _summary_value(
                     summary,
                     participant,
-                    (day, sample, "sample_scanned"),
+                    (day, sample, "recorded_sample"),
                 )
                 rows.append(
                     {
                         "sampling_time": sampling_time,
                         "time_min": _minutes_between(sampling_time, awakening_time),
-                        "sample_scanned": sample_scanned,
-                        "sample_mismatch": _sample_mismatch(sample, sample_scanned),
+                        "recorded_sample": recorded_sample,
+                        "sample_mismatch": _sample_mismatch(sample, recorded_sample),
                         "observed": not (
                             pd.isna(sampling_time) and _is_missing(barcode)
                         ),
@@ -151,16 +155,18 @@ def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
 
     result = pd.DataFrame(
         rows,
-        index=pd.MultiIndex.from_tuples(index, names=["participant", "day", "sample"]),
+        index=pd.MultiIndex.from_tuples(
+            index, names=["participant", "day", "scheduled_sample"]
+        ),
         columns=[
             "sampling_time",
             "time_min",
-            "sample_scanned",
+            "recorded_sample",
             "sample_mismatch",
             "observed",
         ],
     )
-    result["sample_scanned"] = pd.array(result["sample_scanned"], dtype="string")
+    result["recorded_sample"] = pd.array(result["recorded_sample"], dtype="string")
     result["sample_mismatch"] = pd.array(result["sample_mismatch"], dtype="boolean")
     result["observed"] = pd.array(result["observed"], dtype="boolean")
     return result
@@ -201,7 +207,7 @@ def extract_day_summary_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def _expected_sample(payload: dict) -> str | None:
+def _scheduled_sample(payload: dict) -> str | None:
     if payload.get("sample_expected") not in {None, ""}:
         return str(payload["sample_expected"])
     saliva_id = payload.get("saliva_id")
@@ -265,10 +271,10 @@ def _minutes_between(later: pd.Timestamp, earlier: pd.Timestamp) -> float:
     return (later - earlier).total_seconds() / 60
 
 
-def _sample_mismatch(sample: str, sample_scanned) -> object:
-    if _is_missing(sample_scanned):
+def _sample_mismatch(scheduled_sample: str, recorded_sample) -> object:
+    if _is_missing(recorded_sample):
         return pd.NA
-    return str(sample) != str(sample_scanned)
+    return str(scheduled_sample) != str(recorded_sample)
 
 
 def _is_missing(value) -> bool:

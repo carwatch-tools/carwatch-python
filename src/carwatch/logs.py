@@ -1,4 +1,4 @@
-"""Extract structured information from raw CARWatch log events."""
+"""Extract events and summaries from CARWatch log data."""
 
 from __future__ import annotations
 
@@ -6,12 +6,26 @@ import pandas as pd
 
 from carwatch.exceptions import SchemaError
 
-__all__ = ["extract_awakening", "extract_samples"]
+__all__ = [
+    "extract_awakening_events_from_raw_logs",
+    "extract_awakening_events_from_summary",
+    "extract_day_summary_from_summary",
+    "extract_sample_events_from_raw_logs",
+    "extract_sample_events_from_summary",
+]
 
 _REQUIRED_COLUMNS = {"participant", "date", "timestamp", "action", "payload"}
+_SUMMARY_COLUMN_LEVELS = ["day", "sample", "variable"]
+_DAY_SAMPLE = "day"
+_DAY_VARIABLES = (
+    "date",
+    "awakening_time",
+    "awakening_type",
+    "mismatch_summary",
+)
 
 
-def extract_samples(logs: pd.DataFrame) -> pd.DataFrame:
+def extract_sample_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFrame:
     """Extract barcode scans from raw CARWatch log events.
 
     The returned ``sample`` is the expected sampling position, while
@@ -19,7 +33,7 @@ def extract_samples(logs: pd.DataFrame) -> pd.DataFrame:
 
     Parameters
     ----------
-    logs
+    raw_logs
         Event dataframe returned by :func:`carwatch.io.load_logs`.
 
     Returns
@@ -28,8 +42,8 @@ def extract_samples(logs: pd.DataFrame) -> pd.DataFrame:
         One row per ``barcode_scanned`` event.
 
     """
-    _validate_logs(logs)
-    scans = logs.loc[logs["action"].eq("barcode_scanned")].copy()
+    _validate_raw_logs(raw_logs)
+    scans = raw_logs.loc[raw_logs["action"].eq("barcode_scanned")].copy()
     rows: list[dict] = []
     for row in scans.itertuples(index=False):
         payload = row.payload or {}
@@ -52,7 +66,7 @@ def extract_samples(logs: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def extract_awakening(logs: pd.DataFrame) -> pd.DataFrame:
+def extract_awakening_events_from_raw_logs(raw_logs: pd.DataFrame) -> pd.DataFrame:
     """Extract one app-reported awakening event per participant and date.
 
     A spontaneous awakening takes precedence over an alarm event on the same
@@ -60,7 +74,7 @@ def extract_awakening(logs: pd.DataFrame) -> pd.DataFrame:
 
     Parameters
     ----------
-    logs
+    raw_logs
         Event dataframe returned by :func:`carwatch.io.load_logs`.
 
     Returns
@@ -69,9 +83,9 @@ def extract_awakening(logs: pd.DataFrame) -> pd.DataFrame:
         Awakening timestamps and reporting types.
 
     """
-    _validate_logs(logs)
-    candidate = logs.loc[
-        logs["action"].isin(["spontaneous_awakening", "alarm_stop"])
+    _validate_raw_logs(raw_logs)
+    candidate = raw_logs.loc[
+        raw_logs["action"].isin(["spontaneous_awakening", "alarm_stop"])
     ].copy()
     if candidate.empty:
         return pd.DataFrame(
@@ -95,6 +109,102 @@ def extract_awakening(logs: pd.DataFrame) -> pd.DataFrame:
     ].reset_index(drop=True)
 
 
+def extract_sample_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
+    """Extract one row per expected sample from a Study Manager summary."""
+    _validate_summary(summary)
+    rows: list[dict] = []
+    index: list[tuple] = []
+    for participant in summary.index:
+        for day in _days(summary):
+            awakening_time = _summary_value(
+                summary,
+                participant,
+                (day, _DAY_SAMPLE, "awakening_time"),
+            )
+            for sample in _samples(summary, day):
+                sampling_time = _summary_value(
+                    summary,
+                    participant,
+                    (day, sample, "sampling_time"),
+                )
+                barcode = _summary_value(
+                    summary,
+                    participant,
+                    (day, sample, "barcode"),
+                )
+                sample_scanned = _summary_value(
+                    summary,
+                    participant,
+                    (day, sample, "sample_scanned"),
+                )
+                rows.append(
+                    {
+                        "sampling_time": sampling_time,
+                        "time": _minutes_between(sampling_time, awakening_time),
+                        "barcode": barcode,
+                        "sample_scanned": sample_scanned,
+                        "sample_mismatch": _sample_mismatch(sample, sample_scanned),
+                        "observed": not (
+                            pd.isna(sampling_time) and _is_missing(barcode)
+                        ),
+                    }
+                )
+                index.append((participant, day, sample))
+
+    result = pd.DataFrame(
+        rows,
+        index=pd.MultiIndex.from_tuples(index, names=["participant", "day", "sample"]),
+        columns=[
+            "sampling_time",
+            "time",
+            "barcode",
+            "sample_scanned",
+            "sample_mismatch",
+            "observed",
+        ],
+    )
+    result["barcode"] = pd.array(result["barcode"], dtype="string")
+    result["sample_scanned"] = pd.array(result["sample_scanned"], dtype="string")
+    result["sample_mismatch"] = pd.array(result["sample_mismatch"], dtype="boolean")
+    result["observed"] = pd.array(result["observed"], dtype="boolean")
+    return result
+
+
+def extract_awakening_events_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
+    """Extract awakening information per participant and day from a summary."""
+    day_summary = extract_day_summary_from_summary(summary)
+    return day_summary[["date", "awakening_time", "awakening_type"]].copy()
+
+
+def extract_day_summary_from_summary(summary: pd.DataFrame) -> pd.DataFrame:
+    """Extract day-level information from a Study Manager summary."""
+    _validate_summary(summary)
+    rows: list[dict] = []
+    index: list[tuple] = []
+    for participant in summary.index:
+        for day in _days(summary):
+            rows.append(
+                {
+                    variable: _summary_value(
+                        summary,
+                        participant,
+                        (day, _DAY_SAMPLE, variable),
+                    )
+                    for variable in _DAY_VARIABLES
+                }
+            )
+            index.append((participant, day))
+
+    result = pd.DataFrame(
+        rows,
+        index=pd.MultiIndex.from_tuples(index, names=["participant", "day"]),
+        columns=_DAY_VARIABLES,
+    )
+    for column in ["awakening_type", "mismatch_summary"]:
+        result[column] = pd.array(result[column], dtype="string")
+    return result
+
+
 def _expected_sample(payload: dict) -> str | None:
     if payload.get("sample_expected") not in {None, ""}:
         return str(payload["sample_expected"])
@@ -113,11 +223,63 @@ def _string_or_missing(value) -> str | None:
     return str(value)
 
 
-def _validate_logs(logs: pd.DataFrame) -> None:
-    if not isinstance(logs, pd.DataFrame):
-        raise TypeError("'logs' must be a pandas DataFrame.")
-    missing = _REQUIRED_COLUMNS.difference(logs.columns)
+def _validate_raw_logs(raw_logs: pd.DataFrame) -> None:
+    if not isinstance(raw_logs, pd.DataFrame):
+        raise TypeError("'raw_logs' must be a pandas DataFrame.")
+    missing = _REQUIRED_COLUMNS.difference(raw_logs.columns)
     if missing:
         raise SchemaError(
             f"Log dataframe is missing required columns: {sorted(missing)}"
         )
+
+
+def _validate_summary(summary: pd.DataFrame) -> None:
+    if not isinstance(summary, pd.DataFrame):
+        raise TypeError("'summary' must be a pandas DataFrame.")
+    if summary.index.name != "participant":
+        raise SchemaError("Study summary requires a 'participant' index.")
+    if summary.index.has_duplicates:
+        raise SchemaError("Study summary contains duplicate participants.")
+    if not isinstance(summary.columns, pd.MultiIndex):
+        raise SchemaError("Study summary requires MultiIndex columns.")
+    if list(summary.columns.names) != _SUMMARY_COLUMN_LEVELS:
+        raise SchemaError(
+            f"Study summary column levels must be named {_SUMMARY_COLUMN_LEVELS}."
+        )
+    if summary.columns.has_duplicates:
+        raise SchemaError("Study summary contains duplicate columns.")
+
+
+def _days(summary: pd.DataFrame) -> list[str]:
+    return list(dict.fromkeys(summary.columns.get_level_values("day")))
+
+
+def _samples(summary: pd.DataFrame, day: str) -> list[str]:
+    day_columns = summary.xs(day, axis=1, level="day").columns
+    return [
+        sample
+        for sample in dict.fromkeys(day_columns.get_level_values("sample"))
+        if sample != _DAY_SAMPLE
+    ]
+
+
+def _summary_value(summary: pd.DataFrame, participant, column: tuple):
+    if column not in summary.columns:
+        raise SchemaError(f"Study summary is missing required column: {column}")
+    return summary.at[participant, column]
+
+
+def _minutes_between(later: pd.Timestamp, earlier: pd.Timestamp) -> float:
+    if pd.isna(later) or pd.isna(earlier):
+        return float("nan")
+    return (later - earlier).total_seconds() / 60
+
+
+def _sample_mismatch(sample: str, sample_scanned) -> object:
+    if _is_missing(sample_scanned):
+        return pd.NA
+    return str(sample) != str(sample_scanned)
+
+
+def _is_missing(value) -> bool:
+    return value is None or pd.isna(value) or str(value).strip() == ""

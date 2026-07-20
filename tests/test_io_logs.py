@@ -100,11 +100,11 @@ def test_invalid_json_raises_by_default(tmp_path):
         cw.io.load_logs(path)
 
 
-def test_extract_samples_marks_swapped_tube(tmp_path):
+def test_extract_sample_events_from_raw_logs_marks_swapped_tube(tmp_path):
     path = tmp_path / "carwatch_logs_02.csv"
     path.write_text(CURRENT_LOG)
 
-    samples = cw.logs.extract_samples(cw.io.load_logs(path))
+    samples = cw.logs.extract_sample_events_from_raw_logs(cw.io.load_logs(path))
 
     assert samples["sample"].tolist() == ["B1", "B2"]
     assert samples["sample_scanned"].tolist() == ["B1", "B3"]
@@ -114,7 +114,7 @@ def test_extract_samples_marks_swapped_tube(tmp_path):
     assert "event_index" not in samples
 
 
-def test_extract_awakening_prefers_self_report(tmp_path):
+def test_extract_awakening_events_from_raw_logs_prefers_self_report(tmp_path):
     content = (
         '1747282400000;local;alarm_stop;{"id":0}\n'
         '1747282410799;local;spontaneous_awakening;{"id":0}\n'
@@ -122,7 +122,7 @@ def test_extract_awakening_prefers_self_report(tmp_path):
     path = tmp_path / "carwatch_logs_02.csv"
     path.write_text(content)
 
-    awakening = cw.logs.extract_awakening(cw.io.load_logs(path))
+    awakening = cw.logs.extract_awakening_events_from_raw_logs(cw.io.load_logs(path))
 
     assert len(awakening) == 1
     assert awakening.loc[0, "awakening_type"] == "self-report"
@@ -131,4 +131,4 @@ def test_extract_awakening_prefers_self_report(tmp_path):
 
 def test_extractors_validate_input_schema():
     with pytest.raises(SchemaError):
-        cw.logs.extract_samples(pd.DataFrame({"action": []}))
+        cw.logs.extract_sample_events_from_raw_logs(pd.DataFrame({"action": []}))

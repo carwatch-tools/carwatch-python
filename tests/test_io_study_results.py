@@ -67,27 +67,41 @@ def test_load_study_results_combines_date_and_times(tmp_path):
     )
 
 
-def test_extract_awakening_returns_one_row_per_participant_and_day(tmp_path):
+def test_extract_day_summary_from_summary_returns_one_row_per_day(tmp_path):
     result = cw.io.load_study_results(_write_csv(tmp_path))
 
-    awakening = cw.study_manager.extract_awakening(result)
+    day_summary = cw.logs.extract_day_summary_from_summary(result)
 
-    assert awakening.index.names == ["participant", "day"]
-    assert awakening.index.tolist() == [("02", "D1")]
-    assert awakening.columns.tolist() == [
+    assert day_summary.index.names == ["participant", "day"]
+    assert day_summary.index.tolist() == [("02", "D1")]
+    assert day_summary.columns.tolist() == [
         "date",
         "awakening_time",
         "awakening_type",
         "mismatch_summary",
     ]
-    assert awakening.loc[("02", "D1"), "awakening_type"] == "self-report"
-    assert awakening.loc[("02", "D1"), "mismatch_summary"] == "B2->B3;B3->B2"
+    assert day_summary.loc[("02", "D1"), "awakening_type"] == "self-report"
+    assert day_summary.loc[("02", "D1"), "mismatch_summary"] == "B2->B3;B3->B2"
 
 
-def test_extract_samples_derives_sample_level_information(tmp_path):
+def test_extract_awakening_events_from_summary_returns_awakening_fields(tmp_path):
     result = cw.io.load_study_results(_write_csv(tmp_path))
 
-    samples = cw.study_manager.extract_samples(result)
+    awakening = cw.logs.extract_awakening_events_from_summary(result)
+
+    assert awakening.index.names == ["participant", "day"]
+    assert awakening.columns.tolist() == [
+        "date",
+        "awakening_time",
+        "awakening_type",
+    ]
+    assert awakening.loc[("02", "D1"), "awakening_type"] == "self-report"
+
+
+def test_extract_sample_events_from_summary_derives_sample_fields(tmp_path):
+    result = cw.io.load_study_results(_write_csv(tmp_path))
+
+    samples = cw.logs.extract_sample_events_from_summary(result)
 
     assert samples.index.names == ["participant", "day", "sample"]
     assert samples.index.get_level_values("sample").tolist() == [
@@ -112,7 +126,7 @@ def test_empty_sample_values_remain_unknown(tmp_path):
     data.to_csv(path, index=False)
 
     result = cw.io.load_study_results(path)
-    samples = cw.study_manager.extract_samples(result)
+    samples = cw.logs.extract_sample_events_from_summary(result)
     empty = samples.loc[("02", "D1", "B4")]
 
     assert pd.isna(result.loc["02", ("D1", "B4", "sample_scanned")])
@@ -126,7 +140,7 @@ def test_load_study_results_supports_multiple_days_and_ignores_google_fit(tmp_pa
 study,VP_01,2025-05-15,06:00:00,05:59:00,self-report,06:00:30,0001,S1,2025-05-16,07:00:00,alarm,07:01:00,0002,S1
 """
     result = cw.io.load_study_results(_write_csv(tmp_path, content))
-    awakening = cw.study_manager.extract_awakening(result)
+    awakening = cw.logs.extract_awakening_events_from_summary(result)
 
     assert result.columns.get_level_values("day").unique().tolist() == ["D1", "D2"]
     assert "awakening_time_google_fit" not in result.columns.get_level_values(
@@ -182,8 +196,14 @@ def test_load_study_results_rejects_duplicate_participants(tmp_path):
         cw.io.load_study_results(_write_csv(tmp_path, content))
 
 
-def test_study_manager_helpers_validate_schema():
+def test_summary_extractors_validate_schema():
     with pytest.raises(SchemaError, match="MultiIndex"):
-        cw.study_manager.extract_samples(
+        cw.logs.extract_sample_events_from_summary(
             pd.DataFrame(index=pd.Index(["01"], name="participant"))
         )
+
+
+def test_study_manager_submodule_is_not_public():
+    assert "study_manager" not in cw.__all__
+    with pytest.raises(AttributeError):
+        _ = cw.study_manager

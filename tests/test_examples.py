@@ -17,6 +17,12 @@ def test_import_example_runs_with_synthetic_data():
     assert namespace["study_results"].index.name == "participant"
     assert namespace["study_results"].columns.names == ["day", "sample", "variable"]
     assert namespace["study_awakening"].index.names == ["participant", "day"]
+    assert namespace["study_days"].columns.tolist() == [
+        "date",
+        "awakening_time",
+        "awakening_type",
+        "mismatch_summary",
+    ]
     assert namespace["study_samples"].index.names == [
         "participant",
         "day",

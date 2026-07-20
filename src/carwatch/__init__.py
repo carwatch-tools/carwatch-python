@@ -2,7 +2,7 @@
 
 import importlib
 
-__all__ = ["io", "logs", "study_manager"]
+__all__ = ["io", "logs"]
 
 __version__ = "0.1.0"
 

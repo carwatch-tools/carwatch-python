@@ -24,8 +24,8 @@ print("Raw log events")
 print(logs[["timestamp", "action", "source_file"]])
 
 # Extract the sampling and awakening events needed for subsequent analyses.
-log_samples = cw.logs.extract_samples(logs)
-log_awakening = cw.logs.extract_awakening(logs)
+log_samples = cw.logs.extract_sample_events_from_raw_logs(logs)
+log_awakening = cw.logs.extract_awakening_events_from_raw_logs(logs)
 print("\nExtracted sample scans")
 print(
     log_samples[
@@ -51,8 +51,9 @@ print("\nWide Study Manager results")
 print(study_results)
 
 # Extract focused tables only when day- or sample-level analysis is needed.
-study_awakening = cw.study_manager.extract_awakening(study_results)
-study_samples = cw.study_manager.extract_samples(study_results)
+study_awakening = cw.logs.extract_awakening_events_from_summary(study_results)
+study_days = cw.logs.extract_day_summary_from_summary(study_results)
+study_samples = cw.logs.extract_sample_events_from_summary(study_results)
 print("\nStudy Manager awakening information")
 print(study_awakening)
 print("\nStudy Manager sample information")
@@ -63,4 +64,4 @@ mismatches = study_samples.loc[study_samples["sample_mismatch"].fillna(False)]
 print("\nRecorded sample swaps")
 print(mismatches[["barcode", "sample_scanned"]])
 print("\nRecorded daily mismatch summary")
-print(study_awakening[["mismatch_summary"]])
+print(study_days[["mismatch_summary"]])

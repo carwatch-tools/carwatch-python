@@ -8,7 +8,7 @@ import pandas as pd
 
 from carwatch.exceptions import SchemaError
 
-_IDENTIFIER_COLUMNS = ["subject", "sample"]
+_IDENTIFIER_COLUMNS = ["participant", "sample"]
 
 
 def load_saliva(path: str | Path, *, saliva_type: str = "cortisol") -> pd.DataFrame:

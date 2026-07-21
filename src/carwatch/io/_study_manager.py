@@ -25,7 +25,9 @@ _SAMPLE_VARIABLES = ("sampling_time", "barcode", "recorded_sample")
 _COLUMN_LEVELS = ["day", "sample", "variable"]
 
 
-def load_study_results(path: str | Path, *, tz: str = "Europe/Berlin") -> pd.DataFrame:
+def load_study_manager_export(
+    path: str | Path, *, tz: str = "Europe/Berlin"
+) -> pd.DataFrame:
     """Load a CARWatch Study Manager CSV export in canonical wide format.
 
     The returned dataframe contains one row per participant. Its columns use

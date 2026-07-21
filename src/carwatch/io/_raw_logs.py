@@ -32,7 +32,7 @@ _COLUMNS = [
 ]
 
 
-def load_logs(
+def load_raw_logs(
     path: PathLike | Sequence[PathLike],
     *,
     tz: str = "Europe/Berlin",
@@ -53,8 +53,9 @@ def load_logs(
     Returns
     -------
     pandas.DataFrame
-        One row per raw log event. The ``payload`` column contains parsed
-        dictionaries and ``timestamp`` contains timezone-aware timestamps.
+        One row per raw log event, indexed by ``participant``, ``date``, and
+        timezone-aware ``timestamp``. The ``payload`` column contains parsed
+        dictionaries.
 
     """
     _validate_errors(errors)
@@ -64,14 +65,23 @@ def load_logs(
         frames.extend(_load_path(current_path, tz=tz, errors=errors))
 
     if not frames:
-        return pd.DataFrame(columns=_COLUMNS)
+        return _empty_raw_logs()
 
     result = pd.concat(frames, ignore_index=True)
-    return result.sort_values(
+    result = result.sort_values(
         ["participant", "timestamp", "source_file"],
         kind="stable",
         na_position="last",
-    ).reset_index(drop=True)
+    )
+    result = result.set_index(["participant", "date", "timestamp"])
+    result = result[["action", "payload", "timestamp_ms", "source_file"]]
+    return result
+
+
+def _empty_raw_logs() -> pd.DataFrame:
+    result = pd.DataFrame(columns=_COLUMNS)
+    result = result.set_index(["participant", "date", "timestamp"])
+    return result[["action", "payload", "timestamp_ms", "source_file"]]
 
 
 def _normalize_paths(path: PathLike | Sequence[PathLike]) -> list[Path]:

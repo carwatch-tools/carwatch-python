@@ -1,6 +1,8 @@
 from pathlib import Path
 from runpy import run_path
 
+from pandas.testing import assert_frame_equal
+
 
 def test_import_example_runs_with_synthetic_data():
     example = Path(__file__).parents[1] / "examples" / "CARWatch_Import_Example.py"
@@ -16,6 +18,7 @@ def test_import_example_runs_with_synthetic_data():
     ]
     assert namespace["study_results"].index.name == "participant"
     assert namespace["study_results"].columns.names == ["day", "sample", "variable"]
+    assert_frame_equal(namespace["converted_summary"], namespace["study_results"])
     assert namespace["study_awakening"].index.names == ["participant", "day"]
     assert namespace["study_days"].columns.tolist() == [
         "date",
@@ -40,3 +43,8 @@ def test_import_example_runs_with_synthetic_data():
     ]
     assert namespace["merged_samples"]["sampling_event_recorded"].all()
     assert namespace["merged_samples"]["lab_value_available"].all()
+    assert not namespace["merged_samples"]["sampling_time_imputed"].any()
+    assert_frame_equal(
+        namespace["merged_from_raw_logs"],
+        namespace["merged_samples"],
+    )

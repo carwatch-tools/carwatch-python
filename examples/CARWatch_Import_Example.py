@@ -16,12 +16,12 @@ DATA_DIR = Path(__file__).parent / "data"
 # Load the semicolon-delimited raw app log. Timestamps are converted from Unix
 # milliseconds into timezone-aware pandas timestamps, while JSON payloads are
 # retained as dictionaries.
-logs = cw.io.load_logs(
+logs = cw.io.load_raw_logs(
     DATA_DIR / "carwatch_demo_VP01_20250515.csv",
     tz="Europe/Berlin",
 )
 print("Raw log events")
-print(logs[["timestamp", "action", "source_file"]])
+print(logs[["action", "source_file"]])
 
 # Extract the sampling and awakening events needed for subsequent analyses.
 log_samples = cw.logs.extract_sample_events_from_raw_logs(logs)
@@ -40,9 +40,15 @@ print(
 print("\nExtracted awakening")
 print(log_awakening)
 
+# Convert raw logs directly into the same canonical wide representation as a
+# Study Manager export.
+converted_summary = cw.logs.convert_raw_logs_to_study_manager_summary(logs)
+print("\nStudy Manager summary reconstructed from raw logs")
+print(converted_summary)
+
 # Load the Study Manager export with one participant per row. The columns
 # explicitly encode day, sample, and variable.
-study_results = cw.io.load_study_results(
+study_results = cw.io.load_study_manager_export(
     DATA_DIR / "study_results.csv",
     tz="Europe/Berlin",
 )
@@ -68,7 +74,8 @@ print(study_days[["mismatch_summary"]])
 # Merge laboratory values by the physical tube that was scanned. The values
 # for B2 and B3 are therefore assigned to their actual sampling positions.
 saliva = cw.io.load_saliva(DATA_DIR / "saliva_samples.csv")
-merged_samples = cw.merge_saliva(study_samples, saliva)
+merged_samples = cw.merge_saliva(study_results, saliva)
+merged_from_raw_logs = cw.merge_saliva(converted_summary, saliva)
 print("\nSample information merged with saliva measurements")
 print(
     merged_samples[
@@ -80,6 +87,9 @@ print(
             "sampling_event_recorded",
             "lab_value_available",
             "mismatch_corrected",
+            "sampling_time_imputed",
         ]
     ]
 )
+print("\nRaw logs converted and merged with saliva measurements")
+print(merged_from_raw_logs)

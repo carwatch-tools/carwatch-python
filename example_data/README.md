@@ -19,10 +19,9 @@ import carwatch as cw
 
 data_dir = Path("example_data")
 
-summary = cw.io.load_study_results(data_dir / "availability_cases_summary.csv")
-sample_events = cw.logs.extract_sample_events_from_summary(summary)
-saliva = cw.io.load_saliva(data_dir / "availability_cases_saliva.csv")
-merged = cw.merge_saliva(sample_events, saliva)
+summary = cw.io.load_study_manager_export(data_dir / "study_manager_summary.csv")
+saliva = cw.io.load_saliva(data_dir / "saliva_samples.csv")
+merged = cw.merge_saliva(summary, saliva)
 
 merged[
     [
@@ -34,5 +33,17 @@ merged[
 ]
 ```
 
-The files only encode the four states. They do not prescribe filtering,
-imputation, exclusion, or error handling.
+Impute the missing CARWatch time for B3 with a theoretical schedule relative
+to awakening:
+
+```python
+imputed = cw.merge_saliva(
+    summary,
+    saliva,
+    missing_carwatch_data="impute",
+    sampling_schedule=[15, 30, 45, 60],
+)
+```
+
+Only B3 is imputed. B1 already has complete information; B2 and B4 have no
+laboratory value.

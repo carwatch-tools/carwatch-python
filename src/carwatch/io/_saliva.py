@@ -14,7 +14,7 @@ _IDENTIFIER_COLUMNS = ["participant", "sample"]
 def load_saliva(path: str | Path, *, saliva_type: str = "cortisol") -> pd.DataFrame:
     """Load saliva measurements exported in BioPsyKit long format.
 
-    The CSV file must contain exactly three columns: ``subject``, ``sample``,
+    The CSV file must contain exactly three columns: ``participant``, ``sample``,
     and the saliva biomarker specified by ``saliva_type``. Measurement values
     must be numeric, but may be missing.
 
@@ -28,7 +28,7 @@ def load_saliva(path: str | Path, *, saliva_type: str = "cortisol") -> pd.DataFr
     Returns
     -------
     pandas.DataFrame
-        Measurements indexed by ``subject`` and ``sample``.
+        Measurements indexed by ``participant`` and ``sample``.
 
     Raises
     ------
@@ -63,7 +63,7 @@ def load_saliva(path: str | Path, *, saliva_type: str = "cortisol") -> pd.DataFr
     if result.index.has_duplicates:
         duplicates = result.index[result.index.duplicated()].unique().tolist()
         raise SchemaError(
-            f"Saliva data contain duplicate subject/sample pairs: {duplicates}"
+            f"Saliva data contain duplicate participant/sample pairs: {duplicates}"
         )
     return result
 

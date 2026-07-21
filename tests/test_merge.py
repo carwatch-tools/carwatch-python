@@ -21,14 +21,14 @@ TWO_DAY_SUMMARY = """Participant ID,date_D1,awakening_time_D1_app,sampling_time_
 02,2025-05-15,06:00:00,06:00:00,0010101,B1,,,,2025-05-16,07:00:00,07:00:00,0010103,B3,,,
 """
 
-SALIVA = """subject,sample,cortisol
+SALIVA = """participant,sample,cortisol
 02,B1,1.0
 02,B2,2.0
 02,B3,3.0
 02,B4,4.0
 """
 
-AVAILABILITY_SALIVA = """subject,sample,cortisol
+AVAILABILITY_SALIVA = """participant,sample,cortisol
 02,B1,1.0
 02,B2,
 02,B3,3.0
@@ -395,7 +395,7 @@ def test_merge_saliva_does_not_mutate_inputs(tmp_path):
 
 def test_merge_saliva_rejects_non_numeric_measurements(tmp_path):
     saliva = pd.read_csv(StringIO(SALIVA), dtype="string").set_index(
-        ["subject", "sample"]
+        ["participant", "sample"]
     )
 
     with pytest.raises(SchemaError, match="numeric"):

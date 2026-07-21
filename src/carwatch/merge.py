@@ -51,7 +51,7 @@ def merge_saliva(
         :func:`carwatch.io.load_study_manager_export`.
     saliva
         Measurements returned by :func:`carwatch.io.load_saliva` with the
-        ``subject`` and ``sample`` index levels.
+        ``participant`` and ``sample`` index levels.
     correct_swaps
         Match laboratory tubes using ``recorded_sample``. Set to ``False`` to
         merge measurements by ``scheduled_sample`` instead.
@@ -90,9 +90,7 @@ def merge_saliva(
         events["_match_sample"] = events["scheduled_sample"]
 
     _validate_event_matches(events)
-    laboratory = laboratory.rename(
-        columns={"subject": "participant", "sample": "_matched_sample"}
-    )
+    laboratory = laboratory.rename(columns={"sample": "_matched_sample"})
     merged = events.merge(
         laboratory,
         how="outer",
@@ -468,7 +466,7 @@ def _normalize_saliva(saliva: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
             )
     if laboratory.duplicated(_SALIVA_INDEX).any():
         raise exceptions.SchemaError(
-            "Saliva data contain duplicate subject/sample pairs."
+            "Saliva data contain duplicate participant/sample pairs."
         )
     return laboratory, measurement_columns
 

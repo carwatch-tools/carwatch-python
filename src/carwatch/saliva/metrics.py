@@ -89,9 +89,9 @@ def auc(
     r"""Compute area under the curve with respect to ground and increase.
 
     The trapezoidal formulas follow Pruessner et al. (2003). Sampling times
-    can be supplied explicitly, named by a dataframe column, or read from the
-    default ``time`` column. Individual time vectors are supported for each
-    participant and day.
+    can be supplied explicitly, named by a dataframe column, or read from
+    ``time_min``. The legacy name ``time`` remains supported. Individual time
+    vectors are supported for each participant and day.
     """
     if not isinstance(saliva_type, str):
         return {
@@ -108,7 +108,7 @@ def auc(
         data,
         saliva_type=saliva_type,
         remove_s0=remove_s0,
-        time_column=sample_times if isinstance(sample_times, str) else "time",
+        time_column=sample_times if isinstance(sample_times, str) else None,
     )
     times = _resolve_sample_times(
         prepared, None if isinstance(sample_times, str) else sample_times
@@ -165,7 +165,7 @@ def slope(
     prepared = _prepare_data(
         data,
         saliva_type=saliva_type,
-        time_column=sample_times if isinstance(sample_times, str) else "time",
+        time_column=sample_times if isinstance(sample_times, str) else None,
     )
     indices, labels = _resolve_sample_pair(
         prepared.sample_labels, sample_labels, sample_idx
@@ -241,18 +241,19 @@ def mean_se(
             )
             for current in saliva_type
         }
-    _validate_data(data, saliva_type)
+    sample_index = _validate_data(data, saliva_type)
     frame = data.reset_index()
     if remove_s0:
-        frame = frame.loc[~frame["sample"].isin([0, "0", "S0"])]
+        frame = frame.loc[~frame[sample_index].isin([0, "0", "S0"])]
     groups = _as_list(group_cols)
-    groups.append("sample")
-    if "time" in frame and "time" not in groups:
-        unique_times = frame.groupby("sample", dropna=False)["time"].nunique(
+    groups.append(sample_index)
+    time_column = _default_time_column(frame)
+    if time_column is not None and time_column not in groups:
+        unique_times = frame.groupby(sample_index, dropna=False)[time_column].nunique(
             dropna=False
         )
         if unique_times.le(1).all():
-            groups.append("time")
+            groups.append(time_column)
     grouped = frame.groupby(groups, sort=False, dropna=False)[saliva_type]
     output = pd.concat(
         [grouped.mean().rename("mean"), grouped.sem().rename("se")], axis=1
@@ -321,27 +322,29 @@ def _prepare_data(
     *,
     saliva_type: str,
     remove_s0: bool = False,
-    time_column: str = "time",
+    time_column: str | None = None,
 ) -> _PreparedData:
-    _validate_data(data, saliva_type)
+    sample_index = _validate_data(data, saliva_type)
     frame = data.reset_index()
-    group_cols = [name for name in data.index.names if name != "sample"]
-    all_labels = list(pd.unique(frame["sample"]))
+    group_cols = [name for name in data.index.names if name != sample_index]
+    all_labels = list(pd.unique(frame[sample_index]))
     labels = [
         label for label in all_labels if not (remove_s0 and label in {0, "0", "S0"})
     ]
     if len(labels) < 1:
         raise SchemaError("No saliva samples remain after filtering.")
-    frame = frame.loc[frame["sample"].isin(labels)]
+    frame = frame.loc[frame[sample_index].isin(labels)]
     values = frame.pivot(
-        index=group_cols, columns="sample", values=saliva_type
+        index=group_cols, columns=sample_index, values=saliva_type
     ).reindex(columns=labels)
     values = values.apply(pd.to_numeric, errors="raise").astype(float)
-    values.columns.name = "sample"
+    values.columns.name = sample_index
     times = None
+    if time_column is None:
+        time_column = _default_time_column(frame)
     if time_column in frame:
         times = frame.pivot(
-            index=group_cols, columns="sample", values=time_column
+            index=group_cols, columns=sample_index, values=time_column
         ).reindex(columns=labels)
         times = times.apply(pd.to_numeric, errors="coerce")
     return _PreparedData(
@@ -356,7 +359,8 @@ def _resolve_sample_times(
     if sample_times is None:
         if prepared.times is None:
             raise ValueError(
-                "No sample times specified and no 'time' column is available."
+                "No sample times specified and neither 'time_min' nor 'time' "
+                "is available."
             )
         return prepared.times.to_numpy(dtype=float)
 
@@ -465,7 +469,11 @@ def _kurtosis(values) -> float:
 
 
 def _remove_s0(data: pd.DataFrame) -> pd.DataFrame:
-    return data.drop(index=[0, "0", "S0"], level="sample", errors="ignore")
+    return data.drop(
+        index=[0, "0", "S0"],
+        level=_sample_index_name(data),
+        errors="ignore",
+    )
 
 
 def _remove_s0_times(sample_times, prepared: _PreparedData):
@@ -488,11 +496,29 @@ def _as_list(value: str | Sequence[str] | None) -> list[str]:
     return list(value)
 
 
-def _validate_data(data: pd.DataFrame, saliva_type: str) -> None:
+def _default_time_column(data: pd.DataFrame) -> str | None:
+    for column in ("time_min", "time"):
+        if column in data:
+            return column
+    return None
+
+
+def _sample_index_name(data: pd.DataFrame) -> str:
+    candidates = [
+        name for name in ("scheduled_sample", "sample") if name in data.index.names
+    ]
+    if len(candidates) != 1:
+        raise SchemaError(
+            "Saliva data require exactly one 'scheduled_sample' or 'sample' "
+            "index level."
+        )
+    return candidates[0]
+
+
+def _validate_data(data: pd.DataFrame, saliva_type: str) -> str:
     if not isinstance(data, pd.DataFrame):
         raise TypeError("Saliva data must be a pandas DataFrame.")
-    if "sample" not in data.index.names:
-        raise SchemaError("Saliva data require a 'sample' index level.")
+    sample_index = _sample_index_name(data)
     if saliva_type not in data:
         raise SchemaError(
             f"Saliva data are missing measurement column: {saliva_type!r}"
@@ -501,8 +527,10 @@ def _validate_data(data: pd.DataFrame, saliva_type: str) -> None:
         raise SchemaError("Saliva data contain duplicate sample rows.")
     if len(data.index.names) < 2:
         raise SchemaError(
-            "Saliva data require at least one grouping index in addition to 'sample'."
+            "Saliva data require at least one grouping index in addition to the "
+            "sample index."
         )
+    return sample_index
 
 
 def _finalize(data: pd.DataFrame) -> pd.DataFrame:

@@ -33,11 +33,17 @@ def sample_times_datetime_to_minute(
         raise TypeError("Sample times must be a pandas Series or DataFrame.")
     is_series = isinstance(sample_times, pd.Series)
     if is_series:
-        if "sample" not in sample_times.index.names:
+        sample_indices = [
+            name
+            for name in ("scheduled_sample", "sample")
+            if name in sample_times.index.names
+        ]
+        if len(sample_indices) != 1:
             raise SchemaError(
-                "Long-format sample times require a 'sample' index level."
+                "Long-format sample times require exactly one 'scheduled_sample' "
+                "or 'sample' index level."
             )
-        wide = sample_times.unstack("sample")
+        wide = sample_times.unstack(sample_indices[0])
     else:
         wide = sample_times.copy()
     if wide.empty:

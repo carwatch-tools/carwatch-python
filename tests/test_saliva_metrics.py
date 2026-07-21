@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -12,14 +14,16 @@ def saliva_data(include_s0=False):
     times = [-10, 0, 10, 20, 30] if include_s0 else [0, 10, 20, 30]
     index = pd.MultiIndex.from_product(
         [["VP01", "VP02"], ["D1"], samples],
-        names=["participant", "day", "sample"],
+        names=["participant", "day", "scheduled_sample"],
     )
-    values = [5, 1, 3, 2, 4, 10, 12, 8, 6, 4] if include_s0 else [1, 3, 2, 4, 10, 12, 8, 6]
+    values = (
+        [5, 1, 3, 2, 4, 10, 12, 8, 6, 4] if include_s0 else [1, 3, 2, 4, 10, 12, 8, 6]
+    )
     return pd.DataFrame(
         {
             "cortisol": values,
             "amylase": np.asarray(values) * 10,
-            "time": times * 2,
+            "time_min": times * 2,
         },
         index=index,
     )
@@ -28,12 +32,12 @@ def saliva_data(include_s0=False):
 def test_auc_matches_pruessner_examples():
     index = pd.MultiIndex.from_product(
         [["P1", "P2"], ["S1", "S2", "S3", "S4", "S5"]],
-        names=["participant", "sample"],
+        names=["participant", "scheduled_sample"],
     )
     data = pd.DataFrame(
         {
             "cortisol": [3.5, 7, 14, 7, 10] * 2,
-            "time": [1, 2, 3, 4, 5, 0, 10, 15, 30, 45],
+            "time_min": [1, 2, 3, 4, 5, 0, 10, 15, 30, 45],
         },
         index=index,
     )
@@ -77,7 +81,7 @@ def test_auc_returns_nan_for_incomplete_curve():
 
 def test_auc_rejects_non_increasing_time():
     data = saliva_data()
-    data.loc[("VP01", "D1"), "time"] = [0, 10, 10, 30]
+    data.loc[("VP01", "D1"), "time_min"] = [0, 10, 10, 30]
 
     with pytest.raises(ValueError, match="strictly increasing"):
         cw.saliva.auc(data)
@@ -97,14 +101,18 @@ def test_basic_response_features():
     assert cw.saliva.initial_value(data)["cortisol_ini_val"].tolist() == [1, 10]
     assert cw.saliva.max_value(data)["cortisol_max_val"].tolist() == [4, 12]
     assert cw.saliva.max_increase(data)["cortisol_max_inc"].tolist() == [3, 2]
-    assert cw.saliva.max_increase(data, percent=True)["cortisol_max_inc_percent"].tolist() == [300, 20]
+    assert cw.saliva.max_increase(data, percent=True)[
+        "cortisol_max_inc_percent"
+    ].tolist() == [300, 20]
 
 
 def test_remove_s0_changes_feature_baseline():
     data = saliva_data(include_s0=True)
 
     assert cw.saliva.initial_value(data)["cortisol_ini_val"].tolist() == [5, 10]
-    assert cw.saliva.initial_value(data, remove_s0=True)["cortisol_ini_val"].tolist() == [1, 12]
+    assert cw.saliva.initial_value(data, remove_s0=True)[
+        "cortisol_ini_val"
+    ].tolist() == [1, 12]
 
 
 def test_compute_features_returns_common_feature_set():
@@ -132,7 +140,9 @@ def test_metrics_support_multiple_analytes():
     result = cw.saliva.auc(saliva_data(), saliva_type=["cortisol", "amylase"])
 
     assert set(result) == {"cortisol", "amylase"}
-    assert result["amylase"].iloc[0, 0] == pytest.approx(result["cortisol"].iloc[0, 0] * 10)
+    assert result["amylase"].iloc[0, 0] == pytest.approx(
+        result["cortisol"].iloc[0, 0] * 10
+    )
 
 
 def test_standard_features_and_mean_se():
@@ -141,7 +151,7 @@ def test_standard_features_and_mean_se():
 
     assert standard.loc[("VP01", "D1"), "cortisol_argmax"] == 3
     assert standard.loc[("VP01", "D1"), "cortisol_mean"] == pytest.approx(2.5)
-    assert summary.index.names == ["sample", "time"]
+    assert summary.index.names == ["scheduled_sample", "time_min"]
     assert summary.loc[("S1", 0), "mean"] == pytest.approx(5.5)
 
 
@@ -157,12 +167,43 @@ def test_datetime_sample_times_to_minutes():
     times = pd.DataFrame(
         [["06:00:00", "06:15:00", "06:45:00"]],
         index=pd.Index(["VP01"], name="participant"),
-        columns=pd.Index(["S1", "S2", "S3"], name="sample"),
+        columns=pd.Index(["S1", "S2", "S3"], name="scheduled_sample"),
     )
 
     result = cw.saliva.utils.sample_times_datetime_to_minute(times)
 
     assert result.loc["VP01"].tolist() == [0, 15, 45]
+
+
+def test_metrics_accept_current_merge_output():
+    data_dir = Path(__file__).parents[1] / "examples" / "data"
+    summary = cw.io.load_study_manager_export(data_dir / "study_results.csv")
+    saliva = cw.io.load_saliva(data_dir / "saliva_samples.csv")
+    merged = cw.merge_saliva(summary, saliva)
+
+    result = cw.saliva.compute_features(merged)
+
+    assert result.index.names == ["participant", "day"]
+    assert result.columns.tolist() == [
+        "cortisol_auc_g",
+        "cortisol_auc_i",
+        "cortisol_ini_val",
+        "cortisol_max_val",
+        "cortisol_max_inc",
+        "cortisol_slopeB1B4",
+    ]
+
+
+def test_metrics_keep_legacy_sample_and_time_names():
+    data = (
+        saliva_data()
+        .rename_axis(index={"scheduled_sample": "sample"})
+        .rename(columns={"time_min": "time"})
+    )
+
+    result = cw.saliva.auc(data)
+
+    assert result.loc[("VP01", "D1"), "cortisol_auc_g"] == pytest.approx(75)
 
 
 def test_metrics_validate_schema_and_parameters():
